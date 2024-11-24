@@ -39,11 +39,11 @@ impl Game {
     }
 
     pub fn votes_summary(&self) -> String {
+        let users_iter = self.users.iter();
         if !self.all_voted() {
             return format!(
                 "Votes: {}",
-                self.users
-                    .iter()
+                users_iter
                     .map(|(id, _)| self.show_vote_status_from(id.clone()))
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -52,8 +52,7 @@ impl Game {
 
         format!(
             "Votes: {}",
-            self.users
-                .iter()
+            users_iter
                 .map(|(id, _)| self.show_vote_from(id.clone()))
                 .collect::<Vec<_>>()
                 .join(", ")
