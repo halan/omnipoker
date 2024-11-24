@@ -1,7 +1,7 @@
 # omnipoker
 A simple planning poker server
 
-# Quick Instructions
+## Quick Instructions
 
 To interact with the server, you can install wscat.
 
