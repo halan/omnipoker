@@ -78,7 +78,6 @@ impl StreamHandler<Result<Message, ProtocolError>> for Session {
                     if let ["/join", nickname] =
                         text.split_whitespace().collect::<Vec<_>>().as_slice()
                     {
-                        self.id = Uuid::new_v4();
                         self.nickname = nickname.to_string().into();
                         self.game_addr.do_send(Connect {
                             id: self.id.clone(),
@@ -96,9 +95,6 @@ impl StreamHandler<Result<Message, ProtocolError>> for Session {
                 });
             }
             Ok(Message::Close(reason)) => {
-                self.game_addr.do_send(Disconnect {
-                    id: self.id.clone(),
-                });
                 ctx.close(reason);
                 ctx.stop();
             }

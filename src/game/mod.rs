@@ -60,20 +60,21 @@ impl Game {
         )
     }
 
-    pub fn show_vote_from(&self, id: Uuid) -> String {
-        format!(
-            "{}: {}",
-            self.users.get(&id).unwrap().nickname,
-            self.votes.get(&id).unwrap_or(&Vote::Null)
+    pub fn get_vote(&self, id: Uuid) -> (&Nickname, &Vote) {
+        (
+            &self.users.get(&id).unwrap().nickname,
+            &self.votes.get(&id).unwrap_or(&Vote::Null),
         )
     }
 
+    pub fn show_vote_from(&self, id: Uuid) -> String {
+        let (nickname, vote) = self.get_vote(id);
+        format!("{}: {}", nickname, vote)
+    }
+
     pub fn show_vote_status_from(&self, id: Uuid) -> String {
-        format!(
-            "{}: {}",
-            self.users.get(&id).unwrap().nickname,
-            self.votes.get(&id).unwrap_or(&Vote::Null).status()
-        )
+        let (nickname, vote) = self.get_vote(id);
+        format!("{}: {}", nickname, vote.status())
     }
 
     pub fn users_summary(&self) -> String {
