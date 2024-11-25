@@ -81,7 +81,7 @@ impl StreamHandler<Result<Message, ProtocolError>> for Session {
                         self.nickname = nickname.to_string().into();
                         self.game_addr.do_send(Connect {
                             id: self.id.clone(),
-                            addr: ctx.address(),
+                            addr: ctx.address().recipient::<Print>(),
                             nickname: nickname.to_string(),
                         });
                     }

@@ -43,3 +43,46 @@ impl std::fmt::Display for Vote {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vote_from_str() {
+        assert_eq!(Vote::from("?"), Vote::Unknown);
+        assert_eq!(Vote::from("1"), Vote::Option(1));
+        assert_eq!(Vote::from("2"), Vote::Option(2));
+        assert_eq!(Vote::from("3"), Vote::Option(3));
+        assert_eq!(Vote::from("5"), Vote::Option(5));
+        assert_eq!(Vote::from("8"), Vote::Option(8));
+        assert_eq!(Vote::from("13"), Vote::Option(13));
+        assert_eq!(Vote::from("21"), Vote::Null);
+        assert_eq!(Vote::from("invalid"), Vote::Null);
+    }
+
+    #[test]
+    fn test_vote_new() {
+        assert_eq!(Vote::new(1), Vote::Option(1));
+        assert_eq!(Vote::new(2), Vote::Option(2));
+        assert_eq!(Vote::new(3), Vote::Option(3));
+        assert_eq!(Vote::new(5), Vote::Option(5));
+        assert_eq!(Vote::new(8), Vote::Option(8));
+        assert_eq!(Vote::new(13), Vote::Option(13));
+        assert_eq!(Vote::new(21), Vote::Null);
+    }
+
+    #[test]
+    fn test_vote_status() {
+        assert_eq!(Vote::Null.status(), "not voted");
+        assert_eq!(Vote::Unknown.status(), "voted");
+        assert_eq!(Vote::Option(1).status(), "voted");
+    }
+
+    #[test]
+    fn test_vote_display() {
+        assert_eq!(format!("{}", Vote::Null), "not voted");
+        assert_eq!(format!("{}", Vote::Unknown), "?");
+        assert_eq!(format!("{}", Vote::Option(1)), "1");
+        assert_eq!(format!("{}", Vote::Option(8)), "8");
+    }
+}
