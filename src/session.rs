@@ -1,18 +1,15 @@
+use crate::game::{CommandHandler, ConnId, Msg};
 use actix_web::{web, web::Payload, HttpRequest, HttpResponse};
 use actix_ws::AggregatedMessage;
-
 use futures_util::{
     future::{select, Either},
     StreamExt as _,
 };
-use tokio::{sync::mpsc, task::spawn_local, time::interval};
-
 use std::{
     pin::pin,
     time::{Duration, Instant},
 };
-
-use crate::game::{CommandHandler, ConnId, Msg};
+use tokio::{sync::mpsc, task::spawn_local, time::interval};
 
 async fn handle_text_message<T: CommandHandler>(
     text: &str,
@@ -164,11 +161,9 @@ mod tests {
     use super::*;
     use crate::game::MockCommandHandler;
     use actix_web::web::Data;
+    use actix_web::{dev::Service, test, web, App};
     use mockall::predicate::*;
     use tokio::sync::mpsc;
-
-    use actix_web::dev::Service;
-    use actix_web::{test, web, App};
 
     #[tokio::test]
     async fn test_handle_text_message() {

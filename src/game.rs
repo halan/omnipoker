@@ -1,14 +1,12 @@
+use crate::{session::Nickname, vote::Vote};
 use itertools::Itertools;
 use log::info;
-use mockall::*;
 use rand::{thread_rng, Rng as _};
 use std::{collections::HashMap, io, vec::IntoIter};
 use tokio::sync::{
     mpsc,
     oneshot::{self, error::RecvError},
 };
-
-use crate::{session::Nickname, vote::Vote};
 
 #[derive(Clone, Debug)]
 pub struct User {
@@ -204,7 +202,7 @@ pub enum Command {
 pub type ConnId = usize;
 pub type Msg = String;
 
-#[automock]
+#[cfg_attr(test, mockall::automock)]
 pub trait CommandHandler: Clone {
     async fn connect(
         &self,
@@ -215,6 +213,7 @@ pub trait CommandHandler: Clone {
     async fn vote(&self, id: ConnId, vote: String);
 }
 
+#[cfg(test)]
 impl Clone for MockCommandHandler {
     fn clone(&self) -> Self {
         MockCommandHandler::new()
