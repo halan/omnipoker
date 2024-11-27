@@ -203,7 +203,7 @@ mod tests {
 
         let mut nickname = Some(new_nickname.to_string());
         let mut conn_id = Some(conn_id_result);
-        let vote_text = "OptionA".to_string();
+        let vote_text = "1".to_string();
 
         game_handler
             .expect_vote()

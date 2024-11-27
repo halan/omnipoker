@@ -47,7 +47,7 @@ async fn test_integration_websocket() {
     expect_message(
         &mut ws_stream_1,
         "Votes: Player1: not voted, Player2: not voted",
-        5,
+        waiting_time,
     )
     .await;
 
@@ -55,7 +55,7 @@ async fn test_integration_websocket() {
     expect_message(
         &mut ws_stream_1,
         "Votes: Player1: voted, Player2: not voted",
-        5,
+        waiting_time,
     )
     .await;
 
@@ -63,6 +63,7 @@ async fn test_integration_websocket() {
         .close(None)
         .await
         .expect("Failed to close connection");
+
     ws_stream_2
         .close(None)
         .await

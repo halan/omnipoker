@@ -8,10 +8,7 @@ use tokio::sync::{
     oneshot::{self, error::RecvError},
 };
 
-use self::vote::Vote;
-use crate::session::Nickname;
-
-pub mod vote;
+use crate::{session::Nickname, vote::Vote};
 
 #[derive(Clone, Debug)]
 pub struct User {
@@ -42,7 +39,7 @@ impl GameServer {
         )
     }
 
-    async fn connect(&mut self, tx: mpsc::UnboundedSender<Msg>, nickname: Nickname) -> ConnId {
+    async fn connect(&mut self, tx: mpsc::UnboundedSender<Msg>, nickname: &Nickname) -> ConnId {
         info!("Someone joined");
 
         // register session with random connection ID
@@ -164,7 +161,7 @@ impl GameServer {
                     nickname,
                     res_tx,
                 } => {
-                    let conn_id = self.connect(conn_tx, nickname).await;
+                    let conn_id = self.connect(conn_tx, &nickname).await;
                     let _ = res_tx.send(conn_id);
                 }
 

@@ -7,6 +7,7 @@ use tokio::task::spawn;
 
 mod game;
 mod session;
+mod vote;
 
 const BIND_ADDR: &str = "0.0.0.0:8080";
 
