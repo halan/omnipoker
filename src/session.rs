@@ -1,121 +1,249 @@
-use actix::prelude::*;
-use actix_web::{
-    web::{Data, Payload},
-    Error, HttpRequest, HttpResponse,
-};
-use actix_web_actors::ws::{self, Message, ProtocolError, WebsocketContext};
-use log::info;
-use std::time::{Duration, Instant};
-use uuid::Uuid;
+use actix_web::{web, web::Payload, HttpRequest, HttpResponse};
+use actix_ws::AggregatedMessage;
 
-use crate::{
-    game::Game,
-    messages::{Connect, Disconnect, Print, Voting},
+use futures_util::{
+    future::{select, Either},
+    StreamExt as _,
 };
+use tokio::{sync::mpsc, task::spawn_local, time::interval};
+
+use std::{
+    pin::pin,
+    time::{Duration, Instant},
+};
+
+use crate::game::{CommandHandler, ConnId, Msg};
+
+async fn handle_text_message<T: CommandHandler>(
+    text: &str,
+    nickname: &mut Option<Nickname>,
+    conn_id: &mut Option<ConnId>,
+    game_handler: &T,
+    conn_tx: &mpsc::UnboundedSender<Msg>,
+) {
+    if nickname.is_none() {
+        if let ["/join", new_nickname] = text.split_whitespace().collect::<Vec<_>>().as_slice() {
+            *nickname = Some(new_nickname.to_string());
+            *conn_id = game_handler
+                .connect(conn_tx.clone(), new_nickname.to_string())
+                .await
+                .ok();
+        }
+
+        return;
+    }
+
+    game_handler.vote(conn_id.unwrap(), text.to_string()).await;
+}
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub type Nickname = String;
 
-pub struct Session {
-    id: Uuid,
-    nickname: Option<Nickname>,
-    game_addr: Addr<Game>,
-    hb: Instant,
-}
+pub async fn stream_handler<T: CommandHandler>(
+    game_handler: T,
+    mut session: actix_ws::Session,
+    msg_stream: actix_ws::MessageStream,
+) {
+    log::info!("connected");
 
-impl Session {
-    fn new(game_addr: Addr<Game>) -> Self {
-        Session {
-            id: Uuid::new_v4(),
-            nickname: None,
-            game_addr,
-            hb: Instant::now(),
-        }
-    }
+    let mut nickname = None;
+    let mut conn_id = None;
+    let mut last_heartbeat = Instant::now();
+    let mut interval = interval(HEARTBEAT_INTERVAL);
 
-    fn start_heartbeat(&self, ctx: &mut ws::WebsocketContext<Self>) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, move |actor, ctx| {
-            if Instant::now().duration_since(actor.hb) > CLIENT_TIMEOUT {
-                info!("Client heartbeat failed, disconnecting!");
-                ctx.stop();
-                return;
-            }
-            ctx.ping(b"PING");
-        });
-    }
-}
+    let (conn_tx, mut conn_rx) = mpsc::unbounded_channel();
 
-impl Actor for Session {
-    type Context = WebsocketContext<Self>;
+    let msg_stream = msg_stream
+        .max_frame_size(128 * 1024)
+        .aggregate_continuations()
+        .max_continuation_size(2 * 1024 * 1024);
 
-    fn started(&mut self, ctx: &mut Self::Context) {
-        info!("Stream started");
-        self.start_heartbeat(ctx);
-    }
+    let mut msg_stream = pin!(msg_stream); // outbound
 
-    fn stopped(&mut self, _: &mut Self::Context) {
-        self.game_addr.do_send(Disconnect {
-            id: self.id.clone(),
-        });
-        info!("Stream stopped");
-    }
-}
+    let close_reason = loop {
+        let tick = pin!(interval.tick()); // ticks
+        let msg_rx = pin!(conn_rx.recv()); // inbound
+        let messages = pin!(select(msg_stream.next(), msg_rx)); // inbound & outbound
 
-impl StreamHandler<Result<Message, ProtocolError>> for Session {
-    fn handle(&mut self, msg: Result<Message, ProtocolError>, ctx: &mut Self::Context) {
-        match msg {
-            Ok(Message::Ping(msg)) => {
-                self.hb = Instant::now();
-                ctx.pong(&msg)
-            }
-            Ok(Message::Pong(_)) => {
-                self.hb = Instant::now();
-            }
-            Ok(Message::Text(text)) => {
-                if self.nickname == None {
-                    if let ["/join", nickname] =
-                        text.split_whitespace().collect::<Vec<_>>().as_slice()
-                    {
-                        self.nickname = nickname.to_string().into();
-                        self.game_addr.do_send(Connect {
-                            id: self.id.clone(),
-                            addr: ctx.address().recipient::<Print>(),
-                            nickname: nickname.to_string(),
-                        });
+        match select(messages, tick).await {
+            // commands & messages received from client
+            Either::Left((Either::Left((Some(Ok(msg)), _)), _)) => {
+                log::debug!("msg: {msg:?}");
+
+                match msg {
+                    AggregatedMessage::Ping(bytes) => {
+                        last_heartbeat = Instant::now();
+                        session.pong(&bytes).await.unwrap();
                     }
 
-                    return;
+                    AggregatedMessage::Pong(_) => {
+                        last_heartbeat = Instant::now();
+                    }
+
+                    AggregatedMessage::Text(text) => {
+                        handle_text_message(
+                            &text,
+                            &mut nickname,
+                            &mut conn_id,
+                            &game_handler,
+                            &conn_tx,
+                        )
+                        .await;
+                    }
+
+                    AggregatedMessage::Binary(_bin) => {
+                        log::warn!("unexpected binary message");
+                    }
+
+                    AggregatedMessage::Close(reason) => break reason,
+                }
+            }
+
+            // client WebSocket stream error
+            Either::Left((Either::Left((Some(Err(err)), _)), _)) => {
+                log::error!("{}", err);
+                break None;
+            }
+
+            // client WebSocket stream ended
+            Either::Left((Either::Left((None, _)), _)) => break None,
+
+            // chat messages received from other room participants
+            Either::Left((Either::Right((Some(chat_msg), _)), _)) => {
+                session.text(chat_msg).await.unwrap();
+            }
+
+            // all connection's message senders were dropped
+            Either::Left((Either::Right((None, _)), _)) => unreachable!(
+                "all connection message senders were dropped; chat server may have panicked"
+            ),
+
+            // heartbeat internal tick
+            Either::Right((_inst, _)) => {
+                // if no heartbeat ping/pong received recently, close the connection
+                if Instant::now().duration_since(last_heartbeat) > CLIENT_TIMEOUT {
+                    log::info!(
+                        "client has not sent heartbeat in over {CLIENT_TIMEOUT:?}; disconnecting"
+                    );
+                    break None;
                 }
 
-                self.game_addr.do_send(Voting {
-                    id: self.id.clone(),
-                    vote_text: text.to_string(),
-                });
+                // send heartbeat ping
+                let _ = session.ping(b"").await;
             }
-            Ok(Message::Close(reason)) => {
-                ctx.close(reason);
-                ctx.stop();
-            }
-            _ => (),
-        }
+        };
+    };
+
+    if let Some(conn_id) = conn_id {
+        game_handler.disconnect(conn_id);
     }
+
+    let _ = session.close(close_reason).await;
 }
 
-impl Handler<Print> for Session {
-    type Result = ();
-
-    fn handle(&mut self, msg: Print, ctx: &mut Self::Context) {
-        ctx.text(msg.message);
-    }
-}
-
-pub async fn handler(
+pub async fn handler<T: CommandHandler + Clone + 'static>(
     req: HttpRequest,
-    payload: Payload,
-    game: Data<Addr<Game>>,
-) -> Result<HttpResponse, Error> {
-    info!("Websocket connection initiated");
-    ws::start(Session::new(game.get_ref().clone()), &req, payload)
+    stream: Payload,
+    game_handler: web::Data<T>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
+
+    spawn_local(stream_handler(
+        (*game_handler.get_ref()).clone(),
+        session,
+        msg_stream,
+    ));
+
+    Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::MockCommandHandler;
+    use actix_web::web::Data;
+    use mockall::predicate::*;
+    use tokio::sync::mpsc;
+
+    use actix_web::dev::Service;
+    use actix_web::{test, web, App};
+
+    #[tokio::test]
+    async fn test_handle_text_message() {
+        let mut game_handler = MockCommandHandler::new();
+
+        let conn_tx = mpsc::unbounded_channel::<Msg>().0;
+
+        let mut nickname = None;
+        let mut conn_id = None;
+        let new_nickname = "Player1";
+        let conn_id_result = 42;
+
+        game_handler
+            .expect_connect()
+            .withf({
+                let conn_tx = conn_tx.clone();
+                move |conn, nick| conn.same_channel(&conn_tx) && nick == new_nickname
+            })
+            .returning(move |_, _| Ok(conn_id_result));
+
+        handle_text_message(
+            "/join Player1",
+            &mut nickname,
+            &mut conn_id,
+            &game_handler,
+            &conn_tx,
+        )
+        .await;
+
+        assert_eq!(nickname, Some(new_nickname.to_string()));
+        assert_eq!(conn_id, Some(conn_id_result));
+
+        let mut nickname = Some(new_nickname.to_string());
+        let mut conn_id = Some(conn_id_result);
+        let vote_text = "OptionA".to_string();
+
+        game_handler
+            .expect_vote()
+            .with(eq(conn_id_result.clone()), eq(vote_text.clone()))
+            .returning(|_, _| ());
+
+        handle_text_message(
+            &vote_text,
+            &mut nickname,
+            &mut conn_id,
+            &game_handler,
+            &conn_tx,
+        )
+        .await;
+    }
+
+    #[actix_rt::test]
+    async fn test_websocket() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let game_handler = MockCommandHandler::new();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(Data::new(game_handler))
+                .route("/ws", web::get().to(handler::<MockCommandHandler>)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/ws")
+            .insert_header(("Upgrade", "websocket"))
+            .insert_header(("Connection", "Upgrade"))
+            .insert_header(("Sec-WebSocket-Key", "test_key"))
+            .insert_header(("Sec-WebSocket-Version", "13"))
+            .to_request();
+        let resp = app.call(req).await.unwrap();
+
+        assert_eq!(
+            resp.status(),
+            actix_web::http::StatusCode::SWITCHING_PROTOCOLS
+        );
+    }
 }

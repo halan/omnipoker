@@ -18,7 +18,7 @@ impl From<&str> for Vote {
 }
 
 impl Vote {
-    fn new(value: usize) -> Self {
+    pub fn new(value: usize) -> Self {
         match value {
             // Fibonacci sequence
             1 | 2 | 3 | 5 | 8 | 13 => Vote::Option(value),
