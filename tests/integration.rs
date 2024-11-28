@@ -1,19 +1,16 @@
+use helpers::{collect_messages, expect_message, send_message, ServerGuard};
 use tokio::time::Duration;
 use tokio_tungstenite::connect_async;
 
 mod helpers;
 
-use helpers::{collect_messages, expect_message, send_message, ServerGuard};
-
 #[tokio::test]
 async fn test_integration_websocket() {
     let server_url = "ws://127.0.0.1:8080/ws";
-    let waiting_time = 1; // second
+    let waiting_time = Duration::from_secs(3);
     let mut server_guard = ServerGuard::new();
 
-    server_guard.start();
-
-    tokio::time::sleep(Duration::from_secs(waiting_time)).await; // 😩
+    server_guard.start(server_url, waiting_time).await;
 
     let (mut ws_stream_1, _) = connect_async(server_url)
         .await

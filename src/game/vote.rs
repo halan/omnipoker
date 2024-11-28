@@ -32,6 +32,10 @@ impl Vote {
             _ => "voted",
         }
     }
+
+    pub fn is_valid_vote(&self) -> bool {
+        *self != Vote::Null
+    }
 }
 
 impl std::fmt::Display for Vote {
@@ -84,5 +88,12 @@ mod tests {
         assert_eq!(format!("{}", Vote::Unknown), "?");
         assert_eq!(format!("{}", Vote::Option(1)), "1");
         assert_eq!(format!("{}", Vote::Option(8)), "8");
+    }
+
+    #[test]
+    fn test_vote_is_valid() {
+        assert!(!Vote::Null.is_valid_vote());
+        assert!(Vote::Unknown.is_valid_vote());
+        assert!(Vote::Option(1).is_valid_vote());
     }
 }
