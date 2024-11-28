@@ -105,6 +105,19 @@ pub async fn expect_message<S>(
     }
 }
 
+pub async fn expect_messages<S>(
+    ws_stream: &mut WebSocketStream<S>,
+    expected: Vec<&str>,
+    waiting_time: Duration,
+) where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    let responses = collect_messages(ws_stream, expected.len(), waiting_time).await;
+    for response in responses.iter().zip(expected.iter()) {
+        assert_eq!(response.0, response.1);
+    }
+}
+
 pub async fn collect_messages<S>(
     ws_stream: &mut WebSocketStream<S>,
     count: usize,
@@ -130,7 +143,12 @@ where
     }
 
     if buffer.len() < count {
-        panic!("Expected {} messages but received {}", count, buffer.len());
+        panic!(
+            "Expected {} messages but received {}\n {:?}",
+            count,
+            buffer.len(),
+            buffer
+        );
     }
 
     buffer
