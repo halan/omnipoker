@@ -1,9 +1,14 @@
 use futures_util::{SinkExt, StreamExt};
 use std::process::{Child, Command};
+use tokio::net::TcpStream;
 use tokio::time::{timeout, Duration};
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, WebSocketStream};
 
-// Helper to ensure server is stopped after the test
+use tokio_tungstenite::{
+    connect_async, tungstenite::protocol::Message, MaybeTlsStream, WebSocketStream,
+};
+
+pub type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
+
 pub struct ServerGuard {
     process: Option<Child>,
 }
@@ -51,7 +56,7 @@ impl ServerGuard {
                 }
             }
 
-            tokio::time::sleep(Duration::from_millis(500)).await; // Pequena pausa
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
 }
@@ -65,23 +70,14 @@ impl Drop for ServerGuard {
 }
 
 // Use a generic type for the WebSocket stream
-pub async fn send_message<S>(ws_stream: &mut WebSocketStream<S>, message: &str)
-where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
+pub async fn send_message(ws_stream: &mut WsStream, message: &str) {
     ws_stream
         .send(Message::Text(message.to_string()))
         .await
         .expect("Failed to send message");
 }
 
-pub async fn expect_message<S>(
-    ws_stream: &mut WebSocketStream<S>,
-    expected: &str,
-    timeout_duration: Duration,
-) where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
+pub async fn expect_message(ws_stream: &mut WsStream, expected: &str, timeout_duration: Duration) {
     loop {
         let response = timeout(timeout_duration, ws_stream.next())
             .await
@@ -105,27 +101,22 @@ pub async fn expect_message<S>(
     }
 }
 
-pub async fn expect_messages<S>(
-    ws_stream: &mut WebSocketStream<S>,
+pub async fn expect_messages(
+    ws_stream: &mut WsStream,
     expected: Vec<&str>,
     waiting_time: Duration,
-) where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
+) {
     let responses = collect_messages(ws_stream, expected.len(), waiting_time).await;
     for response in responses.iter().zip(expected.iter()) {
         assert_eq!(response.0, response.1);
     }
 }
 
-pub async fn collect_messages<S>(
-    ws_stream: &mut WebSocketStream<S>,
+pub async fn collect_messages(
+    ws_stream: &mut WsStream,
     count: usize,
     timeout_duration: Duration,
-) -> Vec<String>
-where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
+) -> Vec<String> {
     let mut buffer = Vec::new();
     let start_time = tokio::time::Instant::now();
 
