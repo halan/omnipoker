@@ -132,12 +132,11 @@ pub async fn send_message(ws_stream: &mut WsStream, message: &str) {
 
 pub async fn expect_message(ws_stream: &mut WsStream, expected: &str, timeout_duration: Duration) {
     loop {
-        let response = timeout(timeout_duration, ws_stream.next())
+        match timeout(timeout_duration, ws_stream.next())
             .await
             .expect("Timed out waiting for message")
-            .expect("Failed to read message");
-
-        match response {
+            .expect("Failed to read message")
+        {
             Ok(Message::Text(text)) => {
                 assert_eq!(text, expected);
                 return;
@@ -159,8 +158,11 @@ pub async fn expect_messages(
     expected: Vec<&str>,
     waiting_time: Duration,
 ) {
-    let responses = collect_messages(ws_stream, expected.len(), waiting_time).await;
-    for response in responses.iter().zip(expected.iter()) {
+    for response in collect_messages(ws_stream, expected.len(), waiting_time)
+        .await
+        .iter()
+        .zip(expected.iter())
+    {
         assert_eq!(response.0, response.1);
     }
 }

@@ -165,7 +165,7 @@ impl GameServer {
         }
     }
 
-    pub async fn run(mut self) -> io::Result<()> {
+    pub async fn run(&mut self) -> io::Result<()> {
         while let Some(cmd) = self.cmd_rx.recv().await {
             match cmd {
                 Command::Connect {
@@ -188,6 +188,12 @@ impl GameServer {
                 } => {
                     self.vote(conn_id, vote);
                     let _ = res_tx.send(conn_id);
+                }
+
+                #[cfg(test)]
+                Command::Shutdown => {
+                    println!("Shutting down server.");
+                    break;
                 }
             }
         }
@@ -212,4 +218,119 @@ pub enum Command {
         vote: Vote,
         res_tx: oneshot::Sender<ConnId>,
     },
+
+    #[cfg(test)]
+    Shutdown,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::mpsc;
+    use tokio::sync::oneshot;
+
+    fn setup_test_server() -> (
+        Arc<Mutex<GameServer>>,
+        GameHandle,
+        actix_rt::task::JoinHandle<()>,
+    ) {
+        let (server, handle) = GameServer::new();
+        let server = Arc::new(Mutex::new(server));
+
+        let server_clone = Arc::clone(&server);
+        let server_task = tokio::spawn(async move {
+            let mut server = server_clone.lock().await;
+            server.run().await.unwrap();
+        });
+
+        (server, handle, server_task)
+    }
+
+    async fn shutdown_test_server(
+        handle: &GameHandle,
+        server_task: actix_rt::task::JoinHandle<()>,
+    ) {
+        handle.cmd_tx.send(Command::Shutdown).unwrap();
+        server_task.await.expect("Server task did not complete");
+    }
+
+    async fn connect_user(nickname: &str, handle: &GameHandle) -> ConnId {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let (res_tx, res_rx) = oneshot::channel();
+
+        handle
+            .cmd_tx
+            .send(Command::Connect {
+                conn_tx: tx,
+                nickname: nickname.into(),
+                res_tx,
+            })
+            .unwrap();
+
+        res_rx.await.unwrap()
+    }
+
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    #[tokio::test]
+    async fn test_user_connection() {
+        let (server, handle, server_task) = setup_test_server();
+        let conn_id = connect_user("Player1", &handle).await;
+
+        // unlock the server
+        shutdown_test_server(&handle, server_task).await;
+
+        let server = server.lock().await;
+        assert!(server.users.contains_key(&conn_id));
+        assert_eq!(server.users_summary(), "Users: Player1");
+    }
+
+    #[tokio::test]
+    async fn test_user_disconnection() {
+        let (server, handle, server_task) = setup_test_server();
+
+        let conn_id = connect_user("Player1", &handle).await;
+
+        handle.cmd_tx.send(Command::Disconnect { conn_id }).unwrap();
+
+        // unlock the server
+        shutdown_test_server(&handle, server_task).await;
+        let server = server.lock().await;
+
+        assert!(!server.users.contains_key(&conn_id));
+        assert_eq!(server.users_summary(), "Users: ");
+    }
+
+    #[tokio::test]
+    async fn test_voting() {
+        let (server, handle, server_task) = setup_test_server();
+
+        let conn_id = connect_user("Player1", &handle).await;
+        let _ = connect_user("Player2", &handle).await;
+
+        let vote = Vote::Option(2);
+
+        let (vote_res_tx, vote_res_rx) = oneshot::channel();
+        handle
+            .cmd_tx
+            .send(Command::Vote {
+                conn_id,
+                vote: vote.clone(),
+                res_tx: vote_res_tx,
+            })
+            .unwrap();
+
+        vote_res_rx.await.unwrap();
+
+        // unlock the server
+        shutdown_test_server(&handle, server_task).await;
+        let server = server.lock().await;
+
+        assert_eq!(server.votes.get(&conn_id), Some(&vote));
+        assert_eq!(
+            server.votes_summary(),
+            "Votes: Player1: voted, Player2: not voted"
+        );
+    }
 }

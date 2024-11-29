@@ -4,7 +4,6 @@ use actix_web::{
 };
 use clap::Parser;
 use num_cpus;
-use tokio::task::spawn;
 
 mod game;
 mod logger;
@@ -21,8 +20,7 @@ async fn main() -> std::io::Result<()> {
     logger::init("info");
 
     let cli = Cli::parse();
-    let (game_server, game_handler) = game::GameServer::new();
-    let game_server = spawn(game_server.run());
+    let (mut game_server, game_handler) = game::GameServer::new();
     let addr = cli.addr.as_deref().unwrap_or("127.0.0.1:8080");
 
     log::info!(
@@ -30,6 +28,8 @@ async fn main() -> std::io::Result<()> {
         num_cpus::get(),
         addr
     );
+
+    let server_task = tokio::spawn(async move { game_server.run().await });
 
     HttpServer::new(move || {
         App::new()
@@ -40,7 +40,7 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await?;
 
-    if let Err(_) = game_server.await {
+    if let Err(_) = server_task.await {
         log::error!("Game server task failed");
     }
 
