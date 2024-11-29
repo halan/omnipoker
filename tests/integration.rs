@@ -10,7 +10,9 @@ async fn test_integration_planning_poker() {
     let waiting_time = Duration::from_secs(3);
     let mut server_guard = ServerGuard::new();
 
-    server_guard.start(server_url, waiting_time).await;
+    server_guard
+        .start("ws://127.0.0.1:8080/ws", waiting_time)
+        .await;
 
     let (mut ws_stream_1, _) = connect_async(server_url)
         .await
@@ -85,4 +87,26 @@ async fn test_integration_planning_poker() {
         .close(None)
         .await
         .expect("Failed to close connection");
+
+    let captured_logs = server_guard.read_logs();
+    let expected_logs = vec![
+        "Game started",     // first message
+        "Starting service", // listening message
+        "connected",        // healthcheck
+        "connected",        // Player1
+        "connected",        // Player2
+        "Someone joined",   // Player1 identified
+        "Someone joined",   // Player2 identified
+    ];
+
+    assert_eq!(captured_logs.len(), expected_logs.len());
+
+    for (log, expected) in captured_logs.iter().zip(expected_logs.iter()) {
+        assert!(
+            log.contains(expected),
+            "Expected log: '{}', found: '{}'",
+            expected,
+            log
+        );
+    }
 }

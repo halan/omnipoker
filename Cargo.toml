@@ -23,3 +23,4 @@ num_cpus = "1.15"
 [dev-dependencies]
 mockall = "0.13"
 tokio-tungstenite = "0.17"
+tokio = { version = "1", features = ["full"] }
