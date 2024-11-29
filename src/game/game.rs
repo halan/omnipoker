@@ -9,10 +9,11 @@ pub use super::vote::Vote;
 
 pub type ConnId = usize;
 pub type Msg = String;
+pub type Nickname = String;
 
 #[derive(Clone, Debug)]
 pub struct User {
-    nickname: String,
+    nickname: Nickname,
     tx: mpsc::UnboundedSender<Msg>,
 }
 
@@ -52,7 +53,7 @@ impl GameServer {
             tx,
         };
         self.users.insert(id, user);
-        self.broadcast(self.users_summary());
+        self.broadcast(self.users_summary().as_str());
 
         id
     }
@@ -60,15 +61,15 @@ impl GameServer {
     pub fn disconnect(&mut self, id: ConnId) {
         self.users.remove(&id);
         self.votes.remove(&id);
-        self.broadcast(self.users_summary());
+        self.broadcast(self.users_summary().as_str());
     }
 
     pub fn vote(&mut self, id: ConnId, vote: Vote) {
         self.votes.insert(id, vote.clone());
         if let Vote::Option(vote_value) = vote {
-            self.send_message(id, format!("You voted: {}", vote_value));
+            self.send_message(id, &format!("You voted: {}", vote_value));
         }
-        self.broadcast(self.votes_summary());
+        self.broadcast(self.votes_summary().as_str());
 
         if self.all_voted() {
             self.reset_votes();
@@ -94,7 +95,7 @@ impl GameServer {
         self.format_summary("Users", |(_, user)| user.nickname.clone())
     }
 
-    fn get_vote(&self, id: ConnId) -> Option<(&String, &Vote)> {
+    fn get_vote(&self, id: ConnId) -> Option<(&Nickname, &Vote)> {
         self.users
             .get(&id)
             .map(|user| (&user.nickname, self.votes.get(&id).unwrap_or(&Vote::Null)))
@@ -147,18 +148,18 @@ impl GameServer {
         self.votes.clear();
     }
 
-    fn send_to(&self, targets: Vec<&mpsc::UnboundedSender<Msg>>, message: String) {
+    fn send_to(&self, targets: Vec<&mpsc::UnboundedSender<Msg>>, message: &str) {
         for target in targets {
-            let _ = target.send(message.clone());
+            let _ = target.send(message.into());
         }
     }
 
-    pub fn broadcast(&self, message: String) {
+    pub fn broadcast(&self, message: &str) {
         let targets: Vec<_> = self.users.values().map(|user| &user.tx).collect();
         self.send_to(targets, message);
     }
 
-    pub fn send_message(&self, id: ConnId, message: String) {
+    pub fn send_message(&self, id: ConnId, message: &str) {
         if let Some(user) = self.users.get(&id) {
             self.send_to(vec![&user.tx], message);
         }

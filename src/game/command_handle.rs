@@ -42,18 +42,15 @@ impl CommandHandler for GameHandle {
                 nickname: nickname.into(),
                 res_tx,
             })
-            .unwrap_or_else(|err| {
-                eprintln!(
-                    "Failed to send Command::Connect for nickname {}: {}",
-                    nickname, err
-                );
-            });
+            .expect("Failed to send Command::Connect");
 
         res_rx.await
     }
 
     fn disconnect(&self, conn_id: ConnId) {
-        self.cmd_tx.send(Command::Disconnect { conn_id }).unwrap();
+        self.cmd_tx
+            .send(Command::Disconnect { conn_id })
+            .expect("Failed to send Command::Disconnect");
     }
 
     async fn vote(&self, conn_id: ConnId, vote: &str) {
@@ -65,9 +62,9 @@ impl CommandHandler for GameHandle {
                 vote: Vote::from(vote),
                 res_tx,
             })
-            .unwrap();
+            .expect("Failed to send Command::Vote");
 
-        res_rx.await.unwrap();
+        res_rx.await.expect("Failed to receive ConnId");
     }
 }
 

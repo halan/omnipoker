@@ -1,4 +1,4 @@
-use crate::game::{CommandHandler, ConnId, Msg};
+use crate::game::{CommandHandler, ConnId, Msg, Nickname};
 use actix_web::{web, web::Payload, HttpRequest, HttpResponse};
 use actix_ws::AggregatedMessage;
 use futures_util::{
@@ -13,7 +13,7 @@ use tokio::{sync::mpsc, task::spawn_local, time::interval};
 
 async fn handle_text_message<'a, T: CommandHandler>(
     text: &str,
-    nickname: &mut Option<String>,
+    nickname: &mut Option<Nickname>,
     conn_id: &mut Option<ConnId>,
     game_handler: &T,
     conn_tx: &mpsc::UnboundedSender<Msg>,
@@ -30,7 +30,9 @@ async fn handle_text_message<'a, T: CommandHandler>(
         return;
     }
 
-    game_handler.vote(conn_id.unwrap(), text).await;
+    game_handler
+        .vote(conn_id.expect("conn_id is None"), text)
+        .await;
 }
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -70,7 +72,7 @@ pub async fn stream_handler<T: CommandHandler>(
                 match msg {
                     AggregatedMessage::Ping(bytes) => {
                         last_heartbeat = Instant::now();
-                        session.pong(&bytes).await.unwrap();
+                        session.pong(&bytes).await.expect("failed to send pong");
                     }
 
                     AggregatedMessage::Pong(_) => {
@@ -107,7 +109,10 @@ pub async fn stream_handler<T: CommandHandler>(
 
             // chat messages received from other room participants
             Either::Left((Either::Right((Some(chat_msg), _)), _)) => {
-                session.text(chat_msg).await.unwrap();
+                session
+                    .text(chat_msg)
+                    .await
+                    .expect("failed to send chat message");
             }
 
             // all connection's message senders were dropped
