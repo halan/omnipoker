@@ -43,8 +43,6 @@ pub async fn stream_handler<T: CommandHandler>(
     mut session: actix_ws::Session,
     msg_stream: actix_ws::MessageStream,
 ) {
-    log::info!("connected");
-
     let mut nickname = None;
     let mut conn_id = None;
     let mut last_heartbeat = Instant::now();

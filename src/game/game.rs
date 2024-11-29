@@ -11,13 +11,11 @@ pub type Msg = String;
 pub type Nickname = String;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
-pub struct ConnId {
-    id: Uuid,
-}
+pub struct ConnId(Uuid);
 
 impl ConnId {
     pub fn new() -> Self {
-        ConnId { id: Uuid::new_v4() }
+        ConnId(Uuid::new_v4())
     }
 }
 
@@ -25,15 +23,20 @@ impl ConnId {
 pub struct User {
     nickname: Nickname,
     tx: mpsc::UnboundedSender<Msg>,
+    vote: Vote,
+}
+
+impl User {
+    pub fn vote(&mut self, vote: Vote) {
+        self.vote = vote;
+    }
 }
 
 type UsersMap = HashMap<ConnId, User>;
-type VotesMap = HashMap<ConnId, Vote>;
 
 #[derive(Debug)]
 pub struct GameServer {
     pub users: UsersMap,
-    pub votes: VotesMap,
     pub cmd_rx: mpsc::UnboundedReceiver<Command>,
 }
 
@@ -46,7 +49,6 @@ impl GameServer {
         (
             Self {
                 users: UsersMap::new(),
-                votes: VotesMap::new(),
                 cmd_rx,
             },
             GameHandle { cmd_tx },
@@ -54,13 +56,14 @@ impl GameServer {
     }
 
     async fn connect(&mut self, tx: mpsc::UnboundedSender<Msg>, nickname: &str) -> ConnId {
-        info!("Someone joined");
+        info!("User identified: {}", nickname);
 
         // register session with random connection ID
         let id = ConnId::new();
         let user = User {
             nickname: nickname.to_owned(),
             tx,
+            vote: Vote::Null,
         };
         self.users.insert(id, user);
         self.broadcast(self.users_summary().as_str());
@@ -69,13 +72,17 @@ impl GameServer {
     }
 
     pub fn disconnect(&mut self, id: ConnId) {
+        info!(
+            "User disconnected: {}",
+            self.users.get(&id).map_or("<None>", |user| &user.nickname)
+        );
         self.users.remove(&id);
-        self.votes.remove(&id);
         self.broadcast(self.users_summary().as_str());
     }
 
     pub fn vote(&mut self, id: ConnId, vote: Vote) {
-        self.votes.insert(id, vote.clone());
+        self.users.get_mut(&id).map(|user| user.vote(vote.clone()));
+
         if let Vote::Option(vote_value) = vote {
             self.send_message(id, &format!("You voted: {}", vote_value));
         }
@@ -87,11 +94,7 @@ impl GameServer {
     }
 
     fn all_voted(&self) -> bool {
-        self.users.keys().all(|id| {
-            self.votes
-                .get(id)
-                .map_or(false, |vote| vote.is_valid_vote())
-        })
+        self.users.values().all(|user| user.vote.is_valid_vote())
     }
 
     fn user_pairs_iter(&self) -> IntoIter<(&ConnId, &User)> {
@@ -106,9 +109,7 @@ impl GameServer {
     }
 
     fn get_vote(&self, id: &ConnId) -> Option<(&Nickname, &Vote)> {
-        self.users
-            .get(&id)
-            .map(|user| (&user.nickname, self.votes.get(&id).unwrap_or(&Vote::Null)))
+        self.users.get(&id).map(|user| (&user.nickname, &user.vote))
     }
 
     fn show_vote<F>(&self, id: &ConnId, format_vote: F) -> String
@@ -134,14 +135,11 @@ impl GameServer {
     where
         F: Fn((&ConnId, &User)) -> String,
     {
-        format!(
-            "{}: {}",
-            label,
-            self.user_pairs_iter()
-                .map(mapper)
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
+        let summary =
+            itertools::Itertools::intersperse(self.user_pairs_iter().map(mapper), ", ".to_string())
+                .collect::<String>();
+
+        format!("{}: {}", label, summary)
     }
 
     pub fn votes_summary(&self) -> String {
@@ -155,7 +153,9 @@ impl GameServer {
     }
 
     fn reset_votes(&mut self) {
-        self.votes.clear();
+        self.users.iter_mut().for_each(|(_, user)| {
+            user.vote = Vote::Null;
+        });
     }
 
     fn send_to(&self, targets: Vec<&mpsc::UnboundedSender<Msg>>, message: &str) {
@@ -337,7 +337,7 @@ mod tests {
         shutdown_test_server(&handle, server_task).await;
         let server = server.lock().await;
 
-        assert_eq!(server.votes.get(&conn_id), Some(&vote));
+        assert_eq!(server.show_vote_from(&conn_id), "Player1: 2");
         assert_eq!(
             server.votes_summary(),
             "Votes: Player1: voted, Player2: not voted"

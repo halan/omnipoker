@@ -90,13 +90,11 @@ async fn test_integration_planning_poker() {
 
     let captured_logs = server_guard.read_logs();
     let expected_logs = vec![
-        "Game started",     // first message
-        "Starting service", // listening message
-        "connected",        // healthcheck
-        "connected",        // Player1
-        "connected",        // Player2
-        "Someone joined",   // Player1 identified
-        "Someone joined",   // Player2 identified
+        "Game started",               // first message
+        "Starting service",           // listening message
+        "User identified: Player1",   // Player1 identified
+        "User identified: Player2",   // Player2 identified
+        "User disconnected: Player1", // Player1 disconnected
     ];
 
     assert_eq!(captured_logs.len(), expected_logs.len());
@@ -104,9 +102,9 @@ async fn test_integration_planning_poker() {
     for (log, expected) in captured_logs.iter().zip(expected_logs.iter()) {
         assert!(
             log.contains(expected),
-            "Expected log: '{}', found: '{}'",
-            expected,
-            log
+            "Captured logs:\n{}\n\nexpected:\n{}",
+            captured_logs.join("\n"),
+            expected_logs.join("\n")
         );
     }
 }
