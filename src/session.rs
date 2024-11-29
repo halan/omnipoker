@@ -11,9 +11,9 @@ use std::{
 };
 use tokio::{sync::mpsc, task::spawn_local, time::interval};
 
-async fn handle_text_message<T: CommandHandler>(
+async fn handle_text_message<'a, T: CommandHandler>(
     text: &str,
-    nickname: &mut Option<Nickname>,
+    nickname: &mut Option<String>,
     conn_id: &mut Option<ConnId>,
     game_handler: &T,
     conn_tx: &mpsc::UnboundedSender<Msg>,
@@ -22,7 +22,7 @@ async fn handle_text_message<T: CommandHandler>(
         if let ["/join", new_nickname] = text.split_whitespace().collect::<Vec<_>>().as_slice() {
             *nickname = Some(new_nickname.to_string());
             *conn_id = game_handler
-                .connect(conn_tx.clone(), new_nickname.to_string())
+                .connect(conn_tx.clone(), new_nickname)
                 .await
                 .ok();
         }
@@ -30,13 +30,11 @@ async fn handle_text_message<T: CommandHandler>(
         return;
     }
 
-    game_handler.vote(conn_id.unwrap(), text.to_string()).await;
+    game_handler.vote(conn_id.unwrap(), text).await;
 }
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-
-pub type Nickname = String;
 
 pub async fn stream_handler<T: CommandHandler>(
     game_handler: T,

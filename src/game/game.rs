@@ -1,4 +1,3 @@
-use crate::session::Nickname;
 use itertools::Itertools;
 use log::info;
 use rand::{thread_rng, Rng as _};
@@ -13,7 +12,7 @@ pub type Msg = String;
 
 #[derive(Clone, Debug)]
 pub struct User {
-    nickname: Nickname,
+    nickname: String,
     tx: mpsc::UnboundedSender<Msg>,
 }
 
@@ -43,7 +42,7 @@ impl GameServer {
         )
     }
 
-    async fn connect(&mut self, tx: mpsc::UnboundedSender<Msg>, nickname: &Nickname) -> ConnId {
+    async fn connect(&mut self, tx: mpsc::UnboundedSender<Msg>, nickname: &str) -> ConnId {
         info!("Someone joined");
 
         // register session with random connection ID
@@ -95,7 +94,7 @@ impl GameServer {
         self.format_summary("Users", |(_, user)| user.nickname.clone())
     }
 
-    fn get_vote(&self, id: ConnId) -> Option<(&Nickname, &Vote)> {
+    fn get_vote(&self, id: ConnId) -> Option<(&String, &Vote)> {
         self.users
             .get(&id)
             .map(|user| (&user.nickname, self.votes.get(&id).unwrap_or(&Vote::Null)))
@@ -103,7 +102,7 @@ impl GameServer {
 
     fn show_vote<F>(&self, id: ConnId, format_vote: F) -> String
     where
-        F: Fn(&Nickname, &Vote) -> String,
+        F: Fn(&String, &Vote) -> String,
     {
         self.get_vote(id)
             .map(|(nickname, vote)| format_vote(nickname, vote))
@@ -205,7 +204,7 @@ impl GameServer {
 pub enum Command {
     Connect {
         conn_tx: mpsc::UnboundedSender<Msg>,
-        nickname: Nickname,
+        nickname: String,
         res_tx: oneshot::Sender<ConnId>,
     },
 
