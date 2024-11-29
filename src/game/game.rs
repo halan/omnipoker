@@ -1,15 +1,25 @@
 use itertools::Itertools;
 use log::info;
-use rand::{thread_rng, Rng as _};
 use std::{collections::HashMap, io, vec::IntoIter};
 use tokio::sync::{mpsc, oneshot};
+use uuid::Uuid;
 
 use super::command_handle::*;
 pub use super::vote::Vote;
 
-pub type ConnId = usize;
 pub type Msg = String;
 pub type Nickname = String;
+
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub struct ConnId {
+    id: Uuid,
+}
+
+impl ConnId {
+    pub fn new() -> Self {
+        ConnId { id: Uuid::new_v4() }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct User {
@@ -47,7 +57,7 @@ impl GameServer {
         info!("Someone joined");
 
         // register session with random connection ID
-        let id = thread_rng().gen::<ConnId>();
+        let id = ConnId::new();
         let user = User {
             nickname: nickname.to_owned(),
             tx,
@@ -84,10 +94,10 @@ impl GameServer {
         })
     }
 
-    fn user_pairs_iter(&self) -> IntoIter<(ConnId, &User)> {
+    fn user_pairs_iter(&self) -> IntoIter<(&ConnId, &User)> {
         self.users
             .iter()
-            .map(|(id, user)| (id.clone(), user))
+            .map(|(id, user)| (id, user))
             .sorted_by(|a, b| a.1.nickname.cmp(&b.1.nickname))
     }
 
@@ -95,13 +105,13 @@ impl GameServer {
         self.format_summary("Users", |(_, user)| user.nickname.clone())
     }
 
-    fn get_vote(&self, id: ConnId) -> Option<(&Nickname, &Vote)> {
+    fn get_vote(&self, id: &ConnId) -> Option<(&Nickname, &Vote)> {
         self.users
             .get(&id)
             .map(|user| (&user.nickname, self.votes.get(&id).unwrap_or(&Vote::Null)))
     }
 
-    fn show_vote<F>(&self, id: ConnId, format_vote: F) -> String
+    fn show_vote<F>(&self, id: &ConnId, format_vote: F) -> String
     where
         F: Fn(&String, &Vote) -> String,
     {
@@ -110,11 +120,11 @@ impl GameServer {
             .unwrap_or_else(String::new)
     }
 
-    fn show_vote_from(&self, id: ConnId) -> String {
+    fn show_vote_from(&self, id: &ConnId) -> String {
         self.show_vote(id, |nickname, vote| format!("{}: {}", nickname, vote))
     }
 
-    fn show_vote_status_from(&self, id: ConnId) -> String {
+    fn show_vote_status_from(&self, id: &ConnId) -> String {
         self.show_vote(id, |nickname, vote| {
             format!("{}: {}", nickname, vote.status())
         })
@@ -122,7 +132,7 @@ impl GameServer {
 
     fn format_summary<F>(&self, label: &str, mapper: F) -> String
     where
-        F: Fn((ConnId, &User)) -> String,
+        F: Fn((&ConnId, &User)) -> String,
     {
         format!(
             "{}: {}",
@@ -135,10 +145,10 @@ impl GameServer {
     }
 
     pub fn votes_summary(&self) -> String {
-        let format_fn: Box<dyn Fn(ConnId) -> String> = if self.all_voted() {
-            Box::new(|id: ConnId| self.show_vote_from(id))
+        let format_fn: Box<dyn Fn(&ConnId) -> String> = if self.all_voted() {
+            Box::new(|id: &ConnId| self.show_vote_from(id))
         } else {
-            Box::new(|id: ConnId| self.show_vote_status_from(id))
+            Box::new(|id: &ConnId| self.show_vote_status_from(id))
         };
 
         self.format_summary("Votes", |(id, _)| format_fn(id))
@@ -315,7 +325,7 @@ mod tests {
         handle
             .cmd_tx
             .send(Command::Vote {
-                conn_id,
+                conn_id: conn_id,
                 vote: vote.clone(),
                 res_tx: vote_res_tx,
             })

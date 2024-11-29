@@ -177,7 +177,7 @@ mod tests {
         let mut nickname = None;
         let mut conn_id = None;
         let new_nickname = "Player1";
-        let conn_id_result = 42;
+        let conn_id_result = ConnId::new();
 
         game_handler
             .expect_connect()
