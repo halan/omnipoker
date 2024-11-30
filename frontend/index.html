@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Planning Poker</title>
+    <link data-trunk rel="css" href="static/cards.css" />
+    <style>
+        .hand { font-size: 40px; }
+    </style>
+</head>
+
+<body>
+    <div id="root">
+    </div>
+
+    <script type="module">
+        import init, {run_app} from './planning_poker_frontend.js';
+        init().then(run_app);
+    </script>
+</body>
+</html>

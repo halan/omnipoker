@@ -1,5 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use std::{
+    clone,
     io::{BufRead, BufReader},
     process::{Child, Command, Stdio},
     sync::{Arc, Mutex},
@@ -28,14 +29,21 @@ impl ServerGuard {
         }
     }
 
-    pub async fn start(&mut self, server_url: &str, timeout_duration: Duration) {
+    pub async fn start(&mut self, port: &str, timeout_duration: Duration) {
         if self.process.is_some() {
             panic!("Server is already running!");
         }
 
+        let command = "cargo";
+        let addr = format!("0.0.0.0:{}", port);
+        let args = vec!["run", "--", addr.as_str()];
+        let command_string = format!("{} {}", command, args.join(" "));
+
+        println!("Executing command: {}", command_string);
+
         self.process = Some(
-            Command::new("cargo")
-                .arg("run")
+            Command::new(command)
+                .args(&args)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
@@ -62,7 +70,12 @@ impl ServerGuard {
             println!("waiting...");
             tokio::time::sleep(Duration::from_millis(500)).await;
 
-            match timeout(timeout_duration, connect_async(server_url)).await {
+            match timeout(
+                timeout_duration,
+                connect_async(format!("ws://127.0.0.1:{}/ws", port)),
+            )
+            .await
+            {
                 Ok(Ok(_)) => {
                     println!("Server started successfully!");
                     return;
@@ -101,6 +114,23 @@ impl ServerGuard {
     pub fn read_logs(&self) -> Vec<String> {
         let mut logs = self.logs.lock().unwrap();
         logs.drain(..).collect()
+    }
+
+    pub fn stop(&mut self) {
+        if let Some(mut process) = self.process.take() {
+            println!("Shutting down server...");
+            if let Err(e) = process.kill() {
+                println!("Failed to kill process: {:?}", e);
+            } else {
+                println!("Process killed successfully.");
+            }
+
+            if let Err(e) = process.wait() {
+                println!("Failed to wait for process: {:?}", e);
+            } else {
+                println!("Process waited successfully.");
+            }
+        }
     }
 }
 

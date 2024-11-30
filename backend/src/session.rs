@@ -1,28 +1,53 @@
-use crate::game::{CommandHandler, ConnId, Msg, Nickname};
+use crate::game::{CommandHandler, ConnId, Nickname, OutboundMessage};
 use actix_web::{web, web::Payload, HttpRequest, HttpResponse};
 use actix_ws::AggregatedMessage;
+use bytestring::ByteString;
 use futures_util::{
     future::{select, Either},
     StreamExt as _,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     pin::pin,
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc, task::spawn_local, time::interval};
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum InboundMessage {
+    Connect { nickname: String },
+    Vote { value: String },
+    Unknown,
+}
+
+impl From<ByteString> for InboundMessage {
+    fn from(text: ByteString) -> Self {
+        if text.starts_with("/join") {
+            InboundMessage::Connect {
+                nickname: text.split_whitespace().skip(1).collect(),
+            }
+        } else {
+            InboundMessage::Vote { value: text.into() }
+        }
+    }
+}
+
 async fn handle_text_message<'a, T: CommandHandler>(
-    text: &str,
+    inbound: &InboundMessage,
     nickname: &mut Option<Nickname>,
     conn_id: &mut Option<ConnId>,
     game_handler: &T,
-    conn_tx: &mpsc::UnboundedSender<Msg>,
+    conn_tx: &mpsc::UnboundedSender<OutboundMessage>,
 ) {
     if nickname.is_none() {
-        if let ["/join", new_nickname] = text.split_whitespace().collect::<Vec<_>>().as_slice() {
-            *nickname = Some(new_nickname.to_string());
+        if let InboundMessage::Connect {
+            nickname: new_nickname,
+        } = inbound
+        {
+            *nickname = Some(new_nickname.clone());
             *conn_id = game_handler
-                .connect(conn_tx.clone(), new_nickname)
+                .connect(conn_tx.clone(), new_nickname.as_str())
                 .await
                 .ok();
         }
@@ -30,9 +55,11 @@ async fn handle_text_message<'a, T: CommandHandler>(
         return;
     }
 
-    game_handler
-        .vote(conn_id.expect("conn_id is None"), text)
-        .await;
+    if let InboundMessage::Vote { value: text } = inbound {
+        if let Some(conn_id) = conn_id {
+            game_handler.vote(conn_id.clone(), text.as_str()).await;
+        }
+    }
 }
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -42,6 +69,7 @@ pub async fn stream_handler<T: CommandHandler>(
     game_handler: T,
     mut session: actix_ws::Session,
     msg_stream: actix_ws::MessageStream,
+    mode: Option<Mode>,
 ) {
     let mut nickname = None;
     let mut conn_id = None;
@@ -77,9 +105,17 @@ pub async fn stream_handler<T: CommandHandler>(
                         last_heartbeat = Instant::now();
                     }
 
+                    // text message from client
                     AggregatedMessage::Text(text) => {
+                        let inbound = match mode {
+                            Some(Mode::Json) => {
+                                serde_json::from_str(&text).unwrap_or(InboundMessage::Unknown)
+                            }
+                            _ => text.into(),
+                        };
+
                         handle_text_message(
-                            &text,
+                            &inbound,
                             &mut nickname,
                             &mut conn_id,
                             &game_handler,
@@ -102,18 +138,23 @@ pub async fn stream_handler<T: CommandHandler>(
                 break None;
             }
 
-            // client WebSocket stream ended
             Either::Left((Either::Left((None, _)), _)) => break None,
 
-            // chat messages received from other room participants
-            Either::Left((Either::Right((Some(chat_msg), _)), _)) => {
+            // messages to send to client
+            Either::Left((Either::Right((Some(answer), _)), _)) => {
+                let outbound = match mode {
+                    Some(Mode::Json) => {
+                        serde_json::to_string(&answer).expect("failed to serialize JSON message")
+                    }
+                    _ => answer.to_string(),
+                };
+
                 session
-                    .text(chat_msg)
+                    .text(outbound)
                     .await
                     .expect("failed to send chat message");
             }
 
-            // all connection's message senders were dropped
             Either::Left((Either::Right((None, _)), _)) => unreachable!(
                 "all connection message senders were dropped; chat server may have panicked"
             ),
@@ -141,10 +182,23 @@ pub async fn stream_handler<T: CommandHandler>(
     let _ = session.close(close_reason).await;
 }
 
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum Mode {
+    Json,
+    Text,
+}
+
+#[derive(Deserialize)]
+pub struct QueryParams {
+    mode: Option<Mode>,
+}
+
 pub async fn handler<T: CommandHandler + Clone + 'static>(
     req: HttpRequest,
     stream: Payload,
     game_handler: web::Data<T>,
+    query: web::Query<QueryParams>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
@@ -152,6 +206,7 @@ pub async fn handler<T: CommandHandler + Clone + 'static>(
         (*game_handler.get_ref()).clone(),
         session,
         msg_stream,
+        query.mode.clone(),
     ));
 
     Ok(res)
@@ -170,7 +225,7 @@ mod tests {
     async fn test_handle_text_message() {
         let mut game_handler = MockCommandHandler::new();
 
-        let conn_tx = mpsc::unbounded_channel::<Msg>().0;
+        let conn_tx = mpsc::unbounded_channel::<OutboundMessage>().0;
 
         let mut nickname = None;
         let mut conn_id = None;
@@ -186,7 +241,9 @@ mod tests {
             .returning(move |_, _| Ok(conn_id_result));
 
         handle_text_message(
-            "/join Player1",
+            &InboundMessage::Connect {
+                nickname: new_nickname.to_string(),
+            },
             &mut nickname,
             &mut conn_id,
             &game_handler,
@@ -207,7 +264,9 @@ mod tests {
             .returning(|_, _| ());
 
         handle_text_message(
-            &vote_text,
+            &InboundMessage::Vote {
+                value: vote_text.clone(),
+            },
             &mut nickname,
             &mut conn_id,
             &game_handler,

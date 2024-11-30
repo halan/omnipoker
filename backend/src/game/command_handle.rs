@@ -1,4 +1,4 @@
-use super::game::{Command, ConnId, Msg, Vote};
+use super::game::{Command, ConnId, OutboundMessage, Vote};
 use tokio::sync::{
     mpsc,
     oneshot::{self, error::RecvError},
@@ -9,7 +9,7 @@ use tokio::sync::{
 pub trait CommandHandler: Clone {
     async fn connect(
         &self,
-        conn_tx: mpsc::UnboundedSender<Msg>,
+        conn_tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
     ) -> Result<ConnId, RecvError>;
     fn disconnect(&self, id: ConnId);
@@ -31,7 +31,7 @@ pub struct GameHandle {
 impl CommandHandler for GameHandle {
     async fn connect(
         &self,
-        conn_tx: mpsc::UnboundedSender<Msg>,
+        conn_tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
     ) -> Result<ConnId, RecvError> {
         let (res_tx, res_rx) = oneshot::channel();
