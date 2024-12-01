@@ -9,6 +9,7 @@ use serde::Deserialize;
 use shared::InboundMessage;
 use std::{
     pin::pin,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc, task::spawn_local, time::interval};
@@ -174,20 +175,49 @@ pub struct QueryParams {
     mode: Option<Mode>,
 }
 
+const MAX_SESSIONS: usize = 15;
+
 pub async fn handler<T: CommandHandler + Clone + 'static>(
     req: HttpRequest,
     stream: Payload,
     game_handler: web::Data<T>,
+    session_count: web::Data<Arc<Mutex<usize>>>,
     query: web::Query<QueryParams>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
-    spawn_local(stream_handler(
-        (*game_handler.get_ref()).clone(),
-        session,
-        msg_stream,
-        query.mode.clone(),
-    ));
+    {
+        let mut session_count_guard = session_count.lock().map_err(|_| {
+            log::error!("Failed to acquire session count lock");
+            actix_web::error::ErrorInternalServerError("Failed to acquire session count lock")
+        })?;
+
+        if *session_count_guard >= MAX_SESSIONS {
+            log::warn!("Too many concurrent sessions; rejecting new session");
+            return Ok(HttpResponse::TooManyRequests().finish());
+        }
+
+        *session_count_guard += 1;
+        log::debug!("Session started. Active sessions: {}", *session_count_guard);
+    }
+
+    let session_count = session_count.clone();
+    spawn_local(async move {
+        stream_handler(
+            (*game_handler.get_ref()).clone(),
+            session,
+            msg_stream,
+            query.mode.clone(),
+        )
+        .await;
+
+        if let Ok(mut session_count_guard) = session_count.lock() {
+            *session_count_guard -= 1;
+            log::debug!("Session ended. Active sessions: {}", *session_count_guard);
+        } else {
+            log::error!("Failed to acquire session count lock for decrement");
+        }
+    });
 
     Ok(res)
 }
@@ -259,10 +289,12 @@ mod tests {
     async fn test_websocket() {
         let _ = env_logger::builder().is_test(true).try_init();
         let game_handler = MockCommandHandler::new();
+        let session_count = Arc::new(Mutex::new(0usize));
 
         let app = test::init_service(
             App::new()
                 .app_data(Data::new(game_handler))
+                .app_data(Data::new(session_count))
                 .route("/ws", web::get().to(handler::<MockCommandHandler>)),
         )
         .await;
@@ -279,6 +311,35 @@ mod tests {
         assert_eq!(
             resp.status(),
             actix_web::http::StatusCode::SWITCHING_PROTOCOLS
+        );
+    }
+
+    #[actix_rt::test]
+    async fn test_websocket_limit() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let game_handler = MockCommandHandler::new();
+        let session_count = Arc::new(Mutex::new(15usize));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(Data::new(game_handler))
+                .app_data(Data::new(session_count))
+                .route("/ws", web::get().to(handler::<MockCommandHandler>)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/ws")
+            .insert_header(("Upgrade", "websocket"))
+            .insert_header(("Connection", "Upgrade"))
+            .insert_header(("Sec-WebSocket-Key", "test_key"))
+            .insert_header(("Sec-WebSocket-Version", "13"))
+            .to_request();
+        let resp = app.call(req).await.unwrap();
+
+        assert_eq!(
+            resp.status(),
+            actix_web::http::StatusCode::TOO_MANY_REQUESTS
         );
     }
 }

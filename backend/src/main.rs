@@ -4,6 +4,7 @@ use actix_web::{
 };
 use clap::Parser;
 use num_cpus;
+use std::sync::{Arc, Mutex};
 
 mod game;
 mod logger;
@@ -20,7 +21,6 @@ async fn main() -> std::io::Result<()> {
     logger::init("info");
 
     let cli = Cli::parse();
-    let (mut game_server, game_handler) = game::GameServer::new();
     let addr = cli.addr.as_deref().unwrap_or("127.0.0.1:8080");
 
     log::info!(
@@ -29,11 +29,14 @@ async fn main() -> std::io::Result<()> {
         addr
     );
 
+    let (mut game_server, game_handler) = game::GameServer::new();
     let server_task = tokio::spawn(async move { game_server.run().await });
+    let session_count = Arc::new(Mutex::new(0usize));
 
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(game_handler.clone()))
+            .app_data(Data::new(session_count.clone()))
             .route("/ws", get().to(session::handler::<game::GameHandle>))
     })
     .bind(addr)?

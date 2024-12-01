@@ -1,6 +1,6 @@
 use helpers::{expect_message, expect_messages, send_message, ServerGuard};
-use tokio::time::Duration;
-use tokio_tungstenite::connect_async;
+use tokio::{net::TcpStream, time::Duration};
+use tokio_tungstenite::{connect_async, tungstenite::Error, MaybeTlsStream, WebSocketStream};
 
 mod helpers;
 
@@ -89,8 +89,8 @@ async fn test_integration_planning_poker() {
 
     let captured_logs = server_guard.read_logs();
     let expected_logs = vec![
-        "Game started",               // first message
         "Starting service",           // listening message
+        "Game started",               // first message
         "User identified: Player1",   // Player1 identified
         "User identified: Player2",   // Player2 identified
         "User disconnected: Player1", // Player1 disconnected
@@ -105,5 +105,39 @@ async fn test_integration_planning_poker() {
             captured_logs.join("\n"),
             expected_logs.join("\n")
         );
+    }
+}
+
+#[tokio::test]
+async fn test_server_limit() {
+    let port = "8083";
+    let server_url = format!("ws://127.0.0.1:{}/ws", port);
+    let waiting_time = Duration::from_secs(10);
+    let mut server_guard = ServerGuard::new();
+
+    server_guard.start(port, waiting_time).await;
+
+    const SERVER_LIMIT: usize = 15;
+
+    let mut connections: [Option<WebSocketStream<MaybeTlsStream<TcpStream>>>; SERVER_LIMIT - 1] =
+        Default::default();
+    for i in 0..(SERVER_LIMIT - 1) {
+        let (ws_stream, _) = connect_async(server_url.as_str())
+            .await
+            .expect("Failed to connect to WebSocket");
+        connections[i] = Some(ws_stream);
+    }
+
+    let result = connect_async(server_url.as_str()).await;
+
+    assert!(result.is_ok(), "Unexpected result: {:?}", result);
+
+    match connect_async(server_url).await {
+        Err(Error::Http(response)) => {
+            assert_eq!(response.status(), 429);
+        }
+        result => {
+            panic!("Unexpected result: {:?}", result);
+        }
     }
 }

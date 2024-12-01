@@ -49,7 +49,7 @@ impl Component for Model {
                     </button>
                 </div>
                 <div>
-                    <h2>{ "Users" }</h2>
+                    <h2>{ "👤 Users" }</h2>
                     {
                         for self.user_lists.iter().map(|user| html! { <p>{ user }</p> })
                     }
