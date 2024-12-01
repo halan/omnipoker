@@ -1,4 +1,4 @@
 [workspace]
-members = ["backend", "frontend"]
+members = ["backend", "frontend", "shared"]
 
 resolver = "2"

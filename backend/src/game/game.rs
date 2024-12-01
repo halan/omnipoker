@@ -1,8 +1,8 @@
 use super::command_handle::*;
 pub use super::vote::Vote;
 use log::info;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt, io};
+pub use shared::OutboundMessage;
+use std::{collections::HashMap, io};
 use tokio::sync::{mpsc, oneshot};
 
 use uuid::Uuid;
@@ -28,39 +28,6 @@ pub struct User {
 impl User {
     pub fn vote(&mut self, vote: Vote) {
         self.vote = vote;
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum OutboundMessage {
-    UserList(Vec<String>),
-    VotesList(Vec<(String, String)>),
-    YourVote(String),
-}
-
-impl fmt::Display for OutboundMessage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let text = match self {
-            OutboundMessage::UserList(users) => {
-                format!("Users: {}", users.join(", "))
-            }
-            OutboundMessage::VotesList(votes) => {
-                format!(
-                    "Votes: {}",
-                    votes
-                        .iter()
-                        .map(|(nickname, vote)| format!("{}: {}", nickname, vote))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            OutboundMessage::YourVote(vote) => {
-                format!("You voted: {}", vote)
-            }
-        };
-
-        write!(f, "{}", text)
     }
 }
 

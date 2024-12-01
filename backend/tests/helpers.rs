@@ -1,6 +1,5 @@
 use futures_util::{SinkExt, StreamExt};
 use std::{
-    clone,
     io::{BufRead, BufReader},
     process::{Child, Command, Stdio},
     sync::{Arc, Mutex},
@@ -114,23 +113,6 @@ impl ServerGuard {
     pub fn read_logs(&self) -> Vec<String> {
         let mut logs = self.logs.lock().unwrap();
         logs.drain(..).collect()
-    }
-
-    pub fn stop(&mut self) {
-        if let Some(mut process) = self.process.take() {
-            println!("Shutting down server...");
-            if let Err(e) = process.kill() {
-                println!("Failed to kill process: {:?}", e);
-            } else {
-                println!("Process killed successfully.");
-            }
-
-            if let Err(e) = process.wait() {
-                println!("Failed to wait for process: {:?}", e);
-            } else {
-                println!("Process waited successfully.");
-            }
-        }
     }
 }
 

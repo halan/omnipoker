@@ -1,15 +1,14 @@
 use futures_util::{SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message};
+use shared::{InboundMessage, OutboundMessage};
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::spawn_local;
 use yew::{prelude::*, Renderer};
 
 enum Msg {
-    Connect(String),
-    Disconnect,
-    Vote(String),
-    ReceivedMessage(String),
+    Inbound(InboundMessage),
+    Outbound(OutboundMessage),
 }
 
 struct Model {
@@ -30,9 +29,9 @@ impl Component for Model {
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::Connect(nickname) => {
+            Msg::Inbound(InboundMessage::Connect { nickname }) => {
                 let link = ctx.link().clone();
-                let ws = WebSocket::open("ws://127.0.0.1:8080/ws").unwrap();
+                let ws = WebSocket::open("ws://127.0.0.1:8080/ws?mode=json").unwrap();
 
                 let (write, mut read) = ws.split();
                 self.ws_sink = Some(Rc::new(RefCell::new(write)));
@@ -40,7 +39,9 @@ impl Component for Model {
                 spawn_local(async move {
                     while let Some(Ok(message)) = read.next().await {
                         if let Message::Text(text) = message {
-                            link.send_message(Msg::ReceivedMessage(text));
+                            link.send_message(Msg::Outbound(
+                                serde_json::from_str(&text).unwrap_or(OutboundMessage::Unknown),
+                            ));
                         }
                     }
                 });
@@ -49,30 +50,30 @@ impl Component for Model {
                     let ws_sink = ws_sink.clone();
                     spawn_local(async move {
                         let mut sink = ws_sink.borrow_mut();
-                        sink.send(Message::Text(format!("/join {}", nickname)))
-                            .await
-                            .unwrap();
+                        if let Ok(text) =
+                            serde_json::to_string(&InboundMessage::Connect { nickname })
+                        {
+                            let _ = sink.send(Message::Text(text)).await;
+                        };
                     });
                 }
 
                 true
             }
-            Msg::Disconnect => {
-                self.ws_sink = None;
-                true
-            }
-            Msg::Vote(vote) => {
+            Msg::Inbound(inbound) => {
                 if let Some(ws_sink) = &self.ws_sink {
                     let ws_sink = ws_sink.clone();
                     spawn_local(async move {
                         let mut sink = ws_sink.borrow_mut();
-                        sink.send(Message::Text(vote)).await.unwrap();
+                        if let Ok(text) = serde_json::to_string(&inbound) {
+                            sink.send(Message::Text(text)).await.unwrap();
+                        };
                     });
                 }
                 true
             }
-            Msg::ReceivedMessage(message) => {
-                self.messages.push(message);
+            Msg::Outbound(outbound) => {
+                self.messages.push(outbound.to_string());
                 true
             }
         }
@@ -94,8 +95,7 @@ impl Component for Model {
             <div>
                 <h1>{ "Planning Poker" }</h1>
                 <div>
-                    <button onclick={link.callback(|_| Msg::Connect("Player1".into()))}>{ "Conectar" }</button>
-                    <button onclick={link.callback(|_| Msg::Disconnect)}>{ "Desconectar" }</button>
+                    <button onclick={link.callback(|_| Msg::Inbound(InboundMessage::Connect { nickname: "Player1".into() } ))}>{ "Conectar" }</button>
                 </div>
                 <div>
                     <h2>{ "Mensagens" }</h2>
@@ -116,7 +116,7 @@ impl Component for Model {
                                     <a
                                         onclick={link.callback({
                                             let vote = vote.to_string();
-                                            move |_| Msg::Vote(vote.clone())
+                                            move |_| Msg::Inbound(InboundMessage::Vote { value: vote.clone() })
                                         })}
                                         class={format!("card rank-{} {}", rank.to_lowercase(), suit.to_lowercase())}
                                         href="#"

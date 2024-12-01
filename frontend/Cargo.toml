@@ -16,3 +16,4 @@ gloo-net = "0.6"
 futures-util = "0.3.31"
 wasm-bindgen-futures = "0.4.46"
 web-sys = "0.3.73"
+shared = { path = "../shared" }

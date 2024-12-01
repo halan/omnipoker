@@ -1,37 +1,17 @@
 use crate::game::{CommandHandler, ConnId, Nickname, OutboundMessage};
 use actix_web::{web, web::Payload, HttpRequest, HttpResponse};
 use actix_ws::AggregatedMessage;
-use bytestring::ByteString;
 use futures_util::{
     future::{select, Either},
     StreamExt as _,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use shared::InboundMessage;
 use std::{
     pin::pin,
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc, task::spawn_local, time::interval};
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum InboundMessage {
-    Connect { nickname: String },
-    Vote { value: String },
-    Unknown,
-}
-
-impl From<ByteString> for InboundMessage {
-    fn from(text: ByteString) -> Self {
-        if text.starts_with("/join") {
-            InboundMessage::Connect {
-                nickname: text.split_whitespace().skip(1).collect(),
-            }
-        } else {
-            InboundMessage::Vote { value: text.into() }
-        }
-    }
-}
 
 async fn handle_text_message<'a, T: CommandHandler>(
     inbound: &InboundMessage,
