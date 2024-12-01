@@ -134,7 +134,10 @@ async fn test_server_limit() {
 
     match connect_async(server_url).await {
         Err(Error::Http(response)) => {
-            assert_eq!(response.status(), 429);
+            assert_eq!(
+                response.status(),
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS
+            );
         }
         result => {
             panic!("Unexpected result: {:?}", result);
