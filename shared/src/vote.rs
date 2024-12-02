@@ -78,9 +78,9 @@ impl From<usize> for Vote {
     }
 }
 
-impl Into<String> for Vote {
-    fn into(self) -> String {
-        self.to_string()
+impl From<Vote> for String {
+    fn from(val: Vote) -> Self {
+        val.to_string()
     }
 }
 
@@ -99,9 +99,9 @@ impl From<String> for VoteStatus {
     }
 }
 
-impl Into<String> for VoteStatus {
-    fn into(self) -> String {
-        self.to_string()
+impl From<VoteStatus> for String {
+    fn from(val: VoteStatus) -> Self {
+        val.to_string()
     }
 }
 

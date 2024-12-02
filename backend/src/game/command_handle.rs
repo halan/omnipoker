@@ -5,7 +5,6 @@ use tokio::sync::{
 };
 
 #[cfg_attr(test, mockall::automock)]
-
 pub trait CommandHandler: Clone {
     async fn connect(
         &self,
