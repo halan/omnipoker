@@ -34,11 +34,16 @@ pub fn connect_websocket(
 }
 
 pub async fn send_message(sink: &WebSocketSink, inbound: &InboundMessage) {
-    let mut sink = sink.borrow_mut();
     if let Ok(message) = serde_json::to_string(inbound) {
         log::info!("Sending message: {}", message);
-        let _ = sink.send(Message::Text(message)).await;
+
+        let mut sink = sink.borrow_mut();
+        let send_result = sink.send(Message::Text(message)).await;
+
+        if let Err(err) = send_result {
+            log::error!("Failed to send message: {}", err);
+        }
     } else {
-        todo!();
+        log::error!("Failed to serialize the message");
     }
 }

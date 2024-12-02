@@ -3,6 +3,7 @@ pub use shared::{InboundMessage, OutboundMessage, Vote, VoteStatus};
 use std::borrow::Borrow;
 use yew::prelude::*;
 
+#[derive(Clone, PartialEq)]
 pub enum Stage {
     Init,
     Result(Vec<(String, Vote)>),
