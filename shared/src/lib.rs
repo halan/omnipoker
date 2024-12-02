@@ -1,13 +1,17 @@
 use bytestring::ByteString;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+pub use vote::{Vote, VoteStatus};
+
+mod vote;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum OutboundMessage {
     UserList(Vec<String>),
-    VotesList(Vec<(String, String)>),
-    YourVote(String),
+    VotesResult(Vec<(String, Vote)>),
+    VotesStatus(Vec<(String, VoteStatus)>),
+    YourVote(Vote),
     Unknown,
 }
 
@@ -17,12 +21,22 @@ impl fmt::Display for OutboundMessage {
             OutboundMessage::UserList(users) => {
                 format!("Users: {}", users.join(", "))
             }
-            OutboundMessage::VotesList(votes) => {
+            OutboundMessage::VotesResult(votes) => {
                 format!(
                     "Votes: {}",
                     votes
                         .iter()
                         .map(|(nickname, vote)| format!("{}: {}", nickname, vote))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            OutboundMessage::VotesStatus(statuses) => {
+                format!(
+                    "Votes: {}",
+                    statuses
+                        .iter()
+                        .map(|(nickname, status)| format!("{}: {}", nickname, status))
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -41,7 +55,7 @@ impl fmt::Display for OutboundMessage {
 #[serde(rename_all = "lowercase")]
 pub enum InboundMessage {
     Connect { nickname: String },
-    Vote { value: String },
+    Vote { value: Vote },
     Unknown,
 }
 

@@ -47,17 +47,20 @@ async fn test_integration_planning_poker() {
     .await;
 
     send_message(&mut ws_stream_1, "4").await;
-    expect_message(
+    expect_messages(
         &mut ws_stream_1,
-        "Votes: Player1: not voted, Player2: not voted",
+        vec![
+            "You voted: not voted",
+            "Votes: Player1: not voted, Player2: not voted",
+        ],
         waiting_time,
     )
     .await;
 
     send_message(&mut ws_stream_1, "?").await;
-    expect_message(
+    expect_messages(
         &mut ws_stream_1,
-        "Votes: Player1: voted, Player2: not voted",
+        vec!["You voted: ?", "Votes: Player1: voted, Player2: not voted"],
         waiting_time,
     )
     .await;
@@ -130,8 +133,10 @@ async fn test_server_limit() {
 
     let result = connect_async(server_url.as_str()).await;
 
+    // connection 15
     assert!(result.is_ok(), "Unexpected result: {:?}", result);
 
+    // connection 16 - should fail
     match connect_async(server_url).await {
         Err(Error::Http(response)) => {
             assert_eq!(

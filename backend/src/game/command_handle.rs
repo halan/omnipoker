@@ -13,7 +13,7 @@ pub trait CommandHandler: Clone {
         nickname: &str,
     ) -> Result<ConnId, RecvError>;
     fn disconnect(&self, id: ConnId);
-    async fn vote(&self, id: ConnId, vote: &str);
+    async fn vote(&self, id: ConnId, vote: &Vote);
 }
 
 #[cfg(test)]
@@ -53,13 +53,13 @@ impl CommandHandler for GameHandle {
             .expect("Failed to send Command::Disconnect");
     }
 
-    async fn vote(&self, conn_id: ConnId, vote: &str) {
+    async fn vote(&self, conn_id: ConnId, vote: &Vote) {
         let (res_tx, res_rx) = oneshot::channel();
 
         self.cmd_tx
             .send(Command::Vote {
                 conn_id,
-                vote: Vote::from(vote),
+                vote: vote.clone(),
                 res_tx,
             })
             .expect("Failed to send Command::Vote");
@@ -113,7 +113,7 @@ mod tests {
         let game_handle = GameHandle { cmd_tx };
 
         let conn_id = ConnId::new();
-        let vote_value = "2";
+        let vote_value = Vote::new(2);
 
         tokio::spawn(async move {
             if let Some(Command::Vote {
@@ -128,6 +128,6 @@ mod tests {
             }
         });
 
-        game_handle.vote(conn_id, vote_value).await;
+        game_handle.vote(conn_id, &vote_value).await;
     }
 }

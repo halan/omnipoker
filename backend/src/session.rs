@@ -36,9 +36,9 @@ async fn handle_text_message<'a, T: CommandHandler>(
         return;
     }
 
-    if let InboundMessage::Vote { value: text } = inbound {
+    if let InboundMessage::Vote { value: vote } = inbound {
         if let Some(conn_id) = conn_id {
-            game_handler.vote(conn_id.clone(), text.as_str()).await;
+            game_handler.vote(conn_id.clone(), vote).await;
         }
     }
 }
@@ -89,9 +89,13 @@ pub async fn stream_handler<T: CommandHandler>(
                     // text message from client
                     AggregatedMessage::Text(text) => {
                         let inbound = match mode {
-                            Some(Mode::Json) => {
-                                serde_json::from_str(&text).unwrap_or(InboundMessage::Unknown)
-                            }
+                            Some(Mode::Json) => match serde_json::from_str(&text) {
+                                Ok(inbound) => inbound,
+                                Err(err) => {
+                                    log::error!("failed to parse JSON message: {}", err);
+                                    continue;
+                                }
+                            },
                             _ => text.into(),
                         };
 
@@ -229,6 +233,7 @@ mod tests {
     use actix_web::web::Data;
     use actix_web::{dev::Service, test, web, App};
     use mockall::predicate::*;
+    use shared::Vote;
     use tokio::sync::mpsc;
 
     #[tokio::test]
@@ -266,7 +271,7 @@ mod tests {
 
         let mut nickname = Some(new_nickname.to_string());
         let mut conn_id = Some(conn_id_result);
-        let vote_text = "1".to_string();
+        let vote_text = Vote::new(1);
 
         game_handler
             .expect_vote()

@@ -41,8 +41,8 @@ async fn test_integration_planning_poker_json() {
     expect_messages(
         &mut ws_stream_1,
         vec![
-            r#"{"your_vote":"1"}"#,                                            // you vote
-            r#"{"votes_list":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
+            r#"{"your_vote":"1"}"#, // you vote
+            r#"{"votes_status":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
         ],
         waiting_time,
     )
@@ -51,23 +51,29 @@ async fn test_integration_planning_poker_json() {
     send_message(&mut ws_stream_2, r#"{"vote": {"value": "2"}}"#).await;
     expect_message(
         &mut ws_stream_1,
-        r#"{"votes_list":[["Player1","1"],["Player2","2"]]}"#,
+        r#"{"votes_result":[["Player1","1"],["Player2","2"]]}"#,
         waiting_time,
     )
     .await;
 
     send_message(&mut ws_stream_1, r#"{"vote": {"value": "4"}}"#).await;
-    expect_message(
+    expect_messages(
         &mut ws_stream_1,
-        r#"{"votes_list":[["Player1","not voted"],["Player2","not voted"]]}"#,
+        vec![
+            r#"{"your_vote":"not voted"}"#,
+            r#"{"votes_status":[["Player1","not voted"],["Player2","not voted"]]}"#,
+        ],
         waiting_time,
     )
     .await;
 
     send_message(&mut ws_stream_1, r#"{"vote": {"value": "?"}}"#).await;
-    expect_message(
+    expect_messages(
         &mut ws_stream_1,
-        r#"{"votes_list":[["Player1","voted"],["Player2","not voted"]]}"#,
+        vec![
+            r#"{"your_vote":"?"}"#,
+            r#"{"votes_status":[["Player1","voted"],["Player2","not voted"]]}"#,
+        ],
         waiting_time,
     )
     .await;
@@ -81,12 +87,12 @@ async fn test_integration_planning_poker_json() {
         &mut ws_stream_2,
         vec![
             r#"{"user_list":["Player1","Player2"]}"#, // update user list
-            r#"{"votes_list":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
+            r#"{"votes_status":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
             r#"{"your_vote":"2"}"#,                   // you vote
-            r#"{"votes_list":[["Player1","1"],["Player2","2"]]}"#, // votes summary final
-            r#"{"votes_list":[["Player1","not voted"],["Player2","not voted"]]}"#, // votes summary
-            r#"{"votes_list":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
-            r#"{"user_list":["Player2"]}"#,           // update user list
+            r#"{"votes_result":[["Player1","1"],["Player2","2"]]}"#, // votes summary final
+            r#"{"votes_status":[["Player1","not voted"],["Player2","not voted"]]}"#, // votes summary
+            r#"{"votes_status":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
+            r#"{"user_list":["Player2"]}"#,                                      // update user list
         ],
         waiting_time,
     )

@@ -1,7 +1,7 @@
 use super::command_handle::*;
-pub use super::vote::Vote;
 use log::info;
-pub use shared::OutboundMessage;
+use shared::VoteStatus;
+pub use shared::{OutboundMessage, Vote};
 use std::{collections::HashMap, io};
 use tokio::sync::{mpsc, oneshot};
 
@@ -70,6 +70,9 @@ impl GameServer {
         };
         self.users.insert(id, user);
         self.broadcast(self.users_summary());
+        if self.anyone_voted() {
+            self.broadcast(self.votes_summary());
+        }
 
         id
     }
@@ -85,10 +88,7 @@ impl GameServer {
 
     pub fn vote(&mut self, id: ConnId, vote: Vote) {
         self.users.get_mut(&id).map(|user| user.vote(vote.clone()));
-
-        if let Vote::Option(vote) = vote {
-            self.send_message(id, OutboundMessage::YourVote(vote.to_string()));
-        }
+        self.send_message(id, OutboundMessage::YourVote(vote.into()));
         self.broadcast(self.votes_summary());
 
         if self.all_voted() {
@@ -98,6 +98,10 @@ impl GameServer {
 
     fn all_voted(&self) -> bool {
         self.users.values().all(|user| user.vote.is_valid_vote())
+    }
+
+    fn anyone_voted(&self) -> bool {
+        self.users.values().any(|user| user.vote.is_valid_vote())
     }
 
     pub fn users_summary(&self) -> OutboundMessage {
@@ -113,23 +117,33 @@ impl GameServer {
     }
 
     pub fn votes_summary(&self) -> OutboundMessage {
+        if self.all_voted() {
+            self.vote_result_summary()
+        } else {
+            self.vote_status_summary()
+        }
+    }
+
+    fn vote_status_summary(&self) -> OutboundMessage {
+        let mut statuses = self
+            .users
+            .values()
+            .map(|user| (user.nickname.clone(), user.vote.status()))
+            .collect::<Vec<(String, VoteStatus)>>();
+        statuses.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        OutboundMessage::VotesStatus(statuses)
+    }
+
+    fn vote_result_summary(&self) -> OutboundMessage {
         let mut votes = self
             .users
             .values()
-            .map(|user| {
-                let vote_value = if self.all_voted() {
-                    user.vote.to_string()
-                } else {
-                    user.vote.status().to_string()
-                };
-
-                (user.nickname.clone(), vote_value)
-            })
-            .collect::<Vec<(String, String)>>();
-
+            .map(|user| (user.nickname.clone(), user.vote.clone()))
+            .collect::<Vec<(String, Vote)>>();
         votes.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-        OutboundMessage::VotesList(votes)
+        OutboundMessage::VotesResult(votes)
     }
 
     fn reset_votes(&mut self) {
@@ -327,9 +341,9 @@ mod tests {
         assert_eq!(server.users.get(&conn_id).unwrap().vote, Vote::Option(2));
         assert_eq!(
             server.votes_summary(),
-            OutboundMessage::VotesList(vec![
-                ("Player1".into(), "voted".into()),
-                ("Player2".into(), "not voted".into())
+            OutboundMessage::VotesStatus(vec![
+                ("Player1".into(), VoteStatus::Voted),
+                ("Player2".into(), VoteStatus::NotVoted)
             ])
         );
     }
