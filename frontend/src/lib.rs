@@ -16,6 +16,7 @@ enum Stage {
 }
 
 const VOTES: [&'static str; 7] = ["?", "1", "2", "3", "5", "8", "13"];
+const SERVER_ADDR: &str = "ws://127.0.0.1:8080/ws?mode=json";
 
 #[function_component(App)]
 fn app() -> Html {
@@ -48,28 +49,38 @@ fn app() -> Html {
             let nickname = nickname.clone();
 
             if ws_sink.borrow().is_none() {
-                if let Some(sink) = connect_websocket("ws://127.0.0.1:8080/ws?mode=json", {
-                    let user_list = user_list.clone();
-                    move |outbound| match outbound {
-                        OutboundMessage::UserList(list) => {
-                            user_list.set(list);
-                        }
+                if let Some(sink) = connect_websocket(
+                    SERVER_ADDR,
+                    {
+                        // message
+                        let user_list = user_list.clone();
+                        move |outbound| match outbound {
+                            OutboundMessage::UserList(list) => {
+                                user_list.set(list);
+                            }
 
-                        OutboundMessage::VotesResult(results) => {
-                            stage.set(Stage::Result(results));
-                            your_vote.set(Vote::Null);
-                        }
+                            OutboundMessage::VotesResult(results) => {
+                                stage.set(Stage::Result(results));
+                            }
 
-                        OutboundMessage::VotesStatus(statuses) => {
-                            stage.set(Stage::Status(statuses));
-                        }
+                            OutboundMessage::VotesStatus(statuses) => {
+                                stage.set(Stage::Status(statuses));
+                            }
 
-                        OutboundMessage::YourVote(vote) => {
-                            your_vote.set(vote);
+                            OutboundMessage::YourVote(vote) => {
+                                your_vote.set(vote);
+                            }
+                            _ => {}
                         }
-                        _ => {}
-                    }
-                }) {
+                    },
+                    {
+                        // error
+                        let ws_sink = ws_sink.clone();
+                        move |_| {
+                            ws_sink.set(None);
+                        }
+                    },
+                ) {
                     ws_sink.set(Some(sink.clone()));
 
                     wasm_bindgen_futures::spawn_local(async move {
