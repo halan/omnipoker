@@ -1,3 +1,4 @@
+use actix_files::Files;
 use actix_web::{
     web::{get, Data},
     App, HttpServer,
@@ -38,6 +39,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(Data::new(game_handler.clone()))
             .app_data(Data::new(session_count.clone()))
             .route("/ws", get().to(session::handler::<game::GameHandle>))
+            .service(Files::new("/", "./frontend/dist").index_file("index.html"))
     })
     .bind(addr)?
     .run()

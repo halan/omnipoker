@@ -1,12 +1,13 @@
 use super::card::Card;
 use crate::hooks::Stage;
-use shared::Vote;
+use shared::{Vote, VoteStatus};
 use yew::prelude::*;
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
     pub stage: Stage,
     pub your_vote: Vote,
+    pub nickname: Option<String>,
     pub on_remove_vote: Callback<String>,
 }
 
@@ -30,27 +31,43 @@ pub fn poker_stage(props: &Props) -> Html {
                             </div>
                         </div>
                     },
-                    Stage::Status(status) => html! {
-                        <div>
-                            <div class="playingCards fourColours">
-                                <ul class="table">
-                                    {
-                                        if props.your_vote != Vote::Null {
-                                            html! {
-                                                <Card vote={props.your_vote.to_string()} on_vote={props.on_remove_vote.clone()} />
+                    Stage::Status(statuses) => {
+                        let statuses = statuses
+                            .iter()
+                            .filter(|(_, status)| *status == VoteStatus::Voted );
+
+                        let you_voted = props.your_vote != Vote::Null &&
+                            statuses.clone().any(|(user, _)| user == props.nickname.as_ref().unwrap());
+
+                        html! {
+                            <div>
+                                <div class="playingCards fourColours">
+                                    <ul class="table">
+                                        {
+                                            if you_voted {
+                                                html! {
+                                                    <Card vote={props.your_vote.to_string()} on_vote={props.on_remove_vote.clone()} />
+                                                }
+                                            } else {
+                                                html! {}
                                             }
-                                        } else {
-                                            html! {}
                                         }
-                                    }
-                                    { for status.iter()
-                                        .map(|(_, vote)| html! {
-                                            <Card vote={vote.to_string()} />
-                                        })
-                                    }
-                                </ul>
+                                        { for statuses
+                                            .filter(|(user, _)| {
+                                                if let Some(nickname) = &props.nickname {
+                                                    user != nickname
+                                                } else {
+                                                    true
+                                                }
+                                            })
+                                            .map(|(_, _)| html! {
+                                                <Card back={true} />
+                                            })
+                                        }
+                                    </ul>
+                                </div>
                             </div>
-                        </div>
+                        }
                     },
                 }
             }

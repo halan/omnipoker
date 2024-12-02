@@ -2,7 +2,7 @@ use yew::prelude::*;
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
-    pub connect_callback: Callback<MouseEvent>,
+    pub connect_callback: Callback<SubmitEvent>,
     pub on_nickname_change: Callback<InputEvent>,
     pub nickname: Option<String>,
 }
@@ -12,15 +12,17 @@ pub fn connect_screen(props: &Props) -> Html {
     html! {
         <div>
             <div>
-                <input
-                    type="text"
-                    placeholder="Enter your nickname"
-                    oninput={props.on_nickname_change.clone()}
-                    value={props.nickname.clone()}
-                />
-                <button onclick={props.connect_callback.clone()}>
-                    { "Connect" }
-                </button>
+                <form onsubmit={props.connect_callback.clone()}>
+                    <input
+                        type="text"
+                        placeholder="Enter your nickname"
+                        oninput={props.on_nickname_change.clone()}
+                        value={props.nickname.clone()}
+                    />
+                    <button type="submit">
+                        { "Connect" }
+                    </button>
+                </form>
             </div>
         </div>
     }

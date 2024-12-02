@@ -17,7 +17,7 @@ pub struct UsePlanningPokerReturn {
     pub ws_sink: UseStateHandle<Option<WebSocketSink>>,
     pub nickname: UseStateHandle<Option<String>>,
     pub on_nickname_change: Callback<InputEvent>,
-    pub connect_callback: Callback<MouseEvent>,
+    pub connect_callback: Callback<SubmitEvent>,
     pub on_vote: Callback<String>,
     pub on_remove_vote: Callback<String>,
 }
