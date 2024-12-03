@@ -9,7 +9,7 @@ pub struct Props {
 #[function_component(UserList)]
 pub fn user_list(props: &Props) -> Html {
     html! {
-        <div>
+        <div class="user-list">
             <h2>{ "👤 Users" }</h2>
             <ul>
             { for props.user_list.iter().map(|user| html! {

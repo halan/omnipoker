@@ -7,6 +7,8 @@ pub struct Props {
     #[prop_or_default]
     pub vote: Option<String>,
     #[prop_or_default]
+    pub player: Option<String>,
+    #[prop_or_default]
     pub on_vote: Option<Callback<String>>,
 }
 
@@ -79,6 +81,15 @@ pub fn card(props: &Props) -> Html {
                             }
                         }
                     }
+                }
+            }
+            {
+                if let Some(player) = &props.player {
+                    html! {
+                        <div class="player-nick">{ player }</div>
+                    }
+                } else {
+                    html! {}
                 }
             }
         </li>

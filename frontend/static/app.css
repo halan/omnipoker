@@ -1,0 +1,154 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f9f9f9;
+    color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.app {
+    width: 100%;
+    max-width: 600px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+    border-radius: 8px;
+}
+
+.app-title {
+    text-align: center;
+    font-size: 2rem;
+    margin: 20px 0;
+    color: #555;
+}
+
+.connect-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.connect-screen form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.connect-screen input {
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 300px;
+    text-align: center;
+}
+
+/* .connect-screen button {
+    padding: 10px;
+    font-size: 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.connect-screen button:hover {
+    background-color: #0056b3;
+} */
+
+.user-list {
+    margin-bottom: 20px;
+}
+
+.user-list h2 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+}
+
+.user-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.user-list li {
+    padding: 5px 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+.stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #f0f0f0;
+    border-radius: 8px;
+    min-height: 160px;
+}
+
+.playingCards {
+    display: flex;
+    justify-content: center;
+}
+
+.table {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    align-items: center;
+}
+
+.table li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.card {
+    width: 50px;
+    height: 75px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    font-size: 1rem;
+    position: relative;
+}
+
+.card.back {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #ccc;
+    font-weight: bold;
+    color: #fff;
+}
+
+.player-nick {
+    margin-top: 5px;
+    font-size: 0.9rem;
+    color: #555;
+    text-align: center;
+}
+
+.app-footer {
+    position: fixed;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #aaa;
+    background: transparent;
+    font-style: italic;
+}

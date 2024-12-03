@@ -10,7 +10,7 @@ pub struct Props {
 #[function_component(ConnectScreen)]
 pub fn connect_screen(props: &Props) -> Html {
     html! {
-        <div>
+        <div class="connect-screen">
             <div>
                 <form onsubmit={props.connect_callback.clone()}>
                     <input
@@ -19,9 +19,6 @@ pub fn connect_screen(props: &Props) -> Html {
                         oninput={props.on_nickname_change.clone()}
                         value={props.nickname.clone()}
                     />
-                    <button type="submit">
-                        { "Connect" }
-                    </button>
                 </form>
             </div>
         </div>

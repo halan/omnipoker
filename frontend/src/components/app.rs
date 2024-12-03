@@ -22,8 +22,8 @@ pub fn app() -> Html {
     } = use_planning_poker(SERVER_ADDR);
 
     html! {
-        <div>
-            <h1>{ "Planning Poker" }</h1>
+        <div class="app">
+            <h1 class="app-title">{ "Planning Poker" }</h1>
             {
             match *ws_sink {
                 None => html! {
@@ -42,6 +42,10 @@ pub fn app() -> Html {
                 },
             }
         }
+            <footer class="app-footer">
+                {"© 2024 Planning Poker | Powered by Halan Pinheiro | "}
+                <a href="http://github.com/halan/omnipoker">{ "source" }</a>
+            </footer>
         </div>
     }
 }

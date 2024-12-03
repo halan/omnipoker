@@ -1,5 +1,6 @@
 use super::card::Card;
 use crate::hooks::Stage;
+use _Props::nickname;
 use shared::{Vote, VoteStatus};
 use yew::prelude::*;
 
@@ -14,7 +15,7 @@ pub struct Props {
 #[function_component(PokerStage)]
 pub fn poker_stage(props: &Props) -> Html {
     html! {
-        <div>
+        <div class="stage">
             {
                 match &props.stage {
                     Stage::Init => html! { "..." },
@@ -23,8 +24,8 @@ pub fn poker_stage(props: &Props) -> Html {
                             <div class="playingCards fourColours">
                                 <ul class="table">
                                 { for result.iter()
-                                    .map(|(_, result)| html! {
-                                        <Card vote={result.to_string()} />
+                                    .map(|(_nickname, result)| html! {
+                                        <Card vote={result.to_string()} player={_nickname.clone()} />
                                     })
                                 }
                                 </ul>
@@ -46,7 +47,10 @@ pub fn poker_stage(props: &Props) -> Html {
                                         {
                                             if you_voted {
                                                 html! {
-                                                    <Card vote={props.your_vote.to_string()} on_vote={props.on_remove_vote.clone()} />
+                                                    <Card
+                                                        vote={props.your_vote.to_string()}
+                                                        on_vote={props.on_remove_vote.clone()}
+                                                        player={props.nickname.clone()} />
                                                 }
                                             } else {
                                                 html! {}
@@ -54,14 +58,14 @@ pub fn poker_stage(props: &Props) -> Html {
                                         }
                                         { for statuses_iter
                                             .filter(|(user, _)| {
-                                                if let Some(nickname) = &props.nickname {
-                                                    user != nickname
+                                                if let Some(_nickname) = &props.nickname {
+                                                    user != _nickname
                                                 } else {
                                                     true
                                                 }
                                             })
-                                            .map(|(_, _)| html! {
-                                                <Card back={true} />
+                                            .map(|(user, _)| html! {
+                                                <Card back={true} player={user.clone()} />
                                             })
                                         }
                                     </ul>
