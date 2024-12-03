@@ -17,14 +17,14 @@ pub fn poker_stage(props: &Props) -> Html {
         <div class="stage">
             {
                 match &props.stage {
-                    Stage::Init => html! { "..." },
+                    Stage::Init => html! { <p>{"Pick a card when you're ready to vote"}</p> },
                     Stage::Result(result) => html! {
                         <div>
                             <div class="playingCards fourColours">
-                                <ul class="table">
+                                <ul class="table result">
                                 { for result.iter()
                                     .map(|(nickname, result)| html! {
-                                        <Card vote={result.to_string()} player={nickname.clone()} />
+                                        <Card vote={result.to_string()} player={nickname.clone()} your={Some(nickname.clone()) == props.nickname.clone()} />
                                     })
                                 }
                                 </ul>
@@ -36,36 +36,26 @@ pub fn poker_stage(props: &Props) -> Html {
                             .iter()
                             .filter(|(_, status)| *status == VoteStatus::Voted );
 
-                        let you_voted = props.your_vote != Vote::Null &&
-                            statuses_iter.clone().any(|(user, _)| user == props.nickname.as_ref().unwrap());
-
                         html! {
                             <div>
                                 <div class="playingCards fourColours">
-                                    <ul class="table">
-                                        {
-                                            if you_voted {
-                                                html! {
-                                                    <Card
-                                                        vote={props.your_vote.to_string()}
-                                                        on_vote={props.on_remove_vote.clone()}
-                                                        player={props.nickname.clone()} />
-                                                }
-                                            } else {
-                                                html! {}
-                                            }
-                                        }
+                                    <ul class="table status">
                                         { for statuses_iter
-                                            .filter(|(user, _)| {
-                                                if let Some(nickname) = &props.nickname {
-                                                    user != nickname
+                                            .map(|(user, _)|
+                                                if Some(user) == props.nickname.as_ref() {
+                                                    html! {
+                                                        <Card
+                                                            vote={props.your_vote.to_string()}
+                                                            on_vote={props.on_remove_vote.clone()}
+                                                            player={props.nickname.clone()}
+                                                        />
+                                                    }
                                                 } else {
-                                                    true
+                                                    html! {
+                                                        <Card back={true} player={user.clone()} />
+                                                    }
                                                 }
-                                            })
-                                            .map(|(user, _)| html! {
-                                                <Card back={true} player={user.clone()} />
-                                            })
+                                            )
                                         }
                                     </ul>
                                 </div>

@@ -9,6 +9,8 @@ pub struct Props {
     #[prop_or_default]
     pub player: Option<String>,
     #[prop_or_default]
+    pub your: bool,
+    #[prop_or_default]
     pub on_vote: Option<Callback<String>>,
 }
 
@@ -74,7 +76,12 @@ pub fn card(props: &Props) -> Html {
                             }
                         } else {
                             html! {
-                                <div class={format!("card rank-{} {}", rank.to_lowercase(), suit.to_lowercase())}>
+                                <div class={format!(
+                                    "card rank-{} {} {}",
+                                    rank.to_lowercase(),
+                                    suit.to_lowercase(),
+                                    if props.your { "your" } else { "" }
+                                )}>
                                     <span class="rank">{ rank }</span>
                                     <span class="suit">{ suit_symbol }</span>
                                 </div>

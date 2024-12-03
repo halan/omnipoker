@@ -10,18 +10,25 @@ pub struct Props {
 pub fn user_list(props: &Props) -> Html {
     html! {
         <div class="user-list">
-            <h2>{ "👤 Users" }</h2>
-            <ul>
-            { for props.user_list.iter().map(|user| html! {
-                if let Some(nickname) = &props.nickname {
-                    if user == nickname {
-                        <li>{ user }{ " (you)"}</li>
-                    } else {
-                        <li>{ user }</li>
+            {
+                if props.user_list.is_empty() {
+                    html! { <p>{ "Loading..." }</p> }
+                } else {
+                    html! {
+                        <ul>
+                        { for props.user_list.iter().map(|user| html! {
+                            if let Some(nickname) = &props.nickname {
+                                if user == nickname {
+                                    <li>{ user }{ " (you)"}</li>
+                                } else {
+                                    <li>{ user }</li>
+                                }
+                            }
+                        }) }
+                        </ul>
                     }
                 }
-            }) }
-            </ul>
+            }
         </div>
     }
 }

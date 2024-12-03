@@ -86,7 +86,7 @@ body {
 
 .stage {
     display: flex;
-    justify-content: center;
+    justify-content: left;
     align-items: center;
     margin: 20px 0;
     padding: 20px;
@@ -95,8 +95,17 @@ body {
     min-height: 160px;
 }
 
+.stage p {
+    text-align: center;
+    width: 100%;
+}
+
 .playingCards {
     display: flex;
+}
+
+.playingCards ul.table {
+    margin: 0;
 }
 
 .table {
@@ -104,6 +113,7 @@ body {
     gap: 20px;
     justify-content: center;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .table li {
@@ -122,6 +132,56 @@ body {
     text-align: center;
     font-size: 1rem;
     position: relative;
+    transform: translateY(0);
+    transition: transform 0.3s ease;
+}
+
+.hand .card {
+    animation: to-bottom 0.3s ease-out;
+}
+
+@keyframes to-bottom {
+    from {
+        transform: translateY(-1em);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+.stage .status .card {
+    animation: to-top 0.3s ease-out;
+}
+
+.stage .status .card.back {
+    animation: to-bottom 0.3s ease-out;
+}
+
+@keyframes to-top {
+    from {
+        transform: translateY(1em);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+.stage .result .card:not(.your) {
+    animation: flip 0.3s ease-out;
+}
+
+@keyframes flip {
+    from {
+        transform: rotateY(0deg);
+    }
+    to {
+        transform: rotateY(180deg);
+    }
+}
+
+.hand .card:hover {
+    animation: none;
+    transform: translateY(-1em);
 }
 
 .card.back {
