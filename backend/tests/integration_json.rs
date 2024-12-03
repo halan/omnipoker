@@ -1,4 +1,5 @@
-use helpers::{expect_message, expect_messages, send_message, ServerGuard};
+use helpers::{expect_message, send_message, ServerGuard};
+use serde_json::json;
 use tokio::time::Duration;
 use tokio_tungstenite::connect_async;
 
@@ -28,12 +29,7 @@ async fn test_integration_planning_poker_json() {
     .await;
 
     expect_message(
-        |text| {
-            assert_eq!(
-                zerify_uuids_from_users_list(&text),
-                json!({"user_list": [{"id": "00", "nickname": "Player1"}]})
-            )
-        },
+        |text| assert_eq!(&text, &json!({"user_list": ["Player1"]}).to_string(),),
         &mut ws_stream_1,
         waiting_time,
     )
@@ -48,8 +44,8 @@ async fn test_integration_planning_poker_json() {
     expect_message(
         |text| {
             assert_eq!(
-                zerify_uuids_from_users_list(&text),
-                json!({"user_list":[{"id": "00", "nickname": "Player1"},{"id": "00", "nickname": "Player2"}]})
+                &text,
+                &json!({"user_list":["Player1","Player2"]}).to_string()
             )
         },
         &mut ws_stream_1,
@@ -161,8 +157,8 @@ async fn test_integration_planning_poker_json() {
     expect_message(
         |text| {
             assert_eq!(
-                zerify_uuids_from_users_list(&text),
-                json!({"user_list":[{"id": "00", "nickname": "Player1"},{"id": "00", "nickname": "Player2"}]})
+                &text,
+                &json!({"user_list":["Player1", "Player2"]}).to_string()
             )
         },
         &mut ws_stream_2,
@@ -229,12 +225,7 @@ async fn test_integration_planning_poker_json() {
     .await;
 
     expect_message(
-        |text| {
-            assert_eq!(
-                zerify_uuids_from_users_list(&text),
-                json!({"user_list": [{"id": "00", "nickname": "Player2"}]})
-            )
-        },
+        |text| assert_eq!(&text, &json!({"user_list": ["Player2"]}).to_string()),
         &mut ws_stream_2,
         waiting_time,
     )
