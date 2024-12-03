@@ -6,7 +6,6 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
 }
 
 .app {
@@ -66,6 +65,8 @@ body {
 
 .user-list {
     margin-bottom: 20px;
+    width: 30%;
+    float: left;
 }
 
 .user-list h2 {
@@ -96,7 +97,6 @@ body {
 
 .playingCards {
     display: flex;
-    justify-content: center;
 }
 
 .table {

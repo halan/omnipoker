@@ -35,8 +35,8 @@ pub fn app() -> Html {
                 },
                 Some(_) => html! {
                     <>
-                        <UserList user_list={(*user_list).clone()} nickname={(*nickname).clone()} />
                         <PokerStage stage={(*stage).clone()} your_vote={(*your_vote).clone()} nickname={(*nickname).clone()} {on_remove_vote} />
+                        <UserList user_list={(*user_list).clone()} nickname={(*nickname).clone()} />
                         <Hand your_vote={(*your_vote).clone()} {on_vote} />
                     </>
                 },
