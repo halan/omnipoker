@@ -16,10 +16,14 @@ pub fn hand(props: &Props) -> Html {
         <div class="playingCards fourColours rotateHand">
             <ul class="hand">
                 { for VOTES.iter()
-                    .filter(|vote| vote.to_string() != props.your_vote.to_string())
                     .map(|vote| {
                         let on_vote = props.on_vote.clone();
-                        html! { <Card vote={*vote} {on_vote} />}
+
+                        if vote.to_string() != props.your_vote.to_string() {
+                            html! { <Card vote={*vote} on_vote={on_vote} /> }
+                        } else {
+                            html! { <li/> }
+                        }
                     })
                 }
             </ul>

@@ -70,8 +70,11 @@ async fn test_integration_planning_poker_json() {
         |text| {
             assert_eq!(
                 &text,
-                &json!({"votes_status": [["Player1", "voted"], ["Player2", "not voted"]]})
-                    .to_string(),
+                &json!({"votes_status": [
+                    ["Player1", "voted"],
+                    ["Player2", "not voted"],
+                ]})
+                .to_string(),
             )
         },
         &mut ws_stream_1,
@@ -114,8 +117,11 @@ async fn test_integration_planning_poker_json() {
         |text| {
             assert_eq!(
                 &text,
-                &json!({"votes_status": [["Player1", "not voted"], ["Player2", "not voted"]]})
-                    .to_string()
+                &json!({"votes_status": [
+                    ["Player1", "not voted"],
+                    ["Player2", "not voted"],
+                ]})
+                .to_string()
             )
         },
         &mut ws_stream_1,
@@ -140,8 +146,11 @@ async fn test_integration_planning_poker_json() {
         |text| {
             assert_eq!(
                 &text,
-                &json!({"votes_status": [["Player1", "voted"], ["Player2", "not voted"]]})
-                    .to_string()
+                &json!({"votes_status": [
+                    ["Player1", "voted"],
+                    ["Player2", "not voted"],
+                ]})
+                .to_string()
             )
         },
         &mut ws_stream_1,

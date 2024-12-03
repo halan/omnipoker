@@ -23,6 +23,7 @@ pub struct User {
     nickname: Nickname,
     tx: mpsc::UnboundedSender<OutboundMessage>,
     vote: Vote,
+    ord: usize,
 }
 
 impl User {
@@ -67,6 +68,7 @@ impl GameServer {
             nickname: nickname.to_owned(),
             tx,
             vote: Vote::Null,
+            ord: 0,
         };
         self.users.insert(id, user);
         self.broadcast(self.users_summary());
@@ -87,7 +89,11 @@ impl GameServer {
     }
 
     pub fn vote(&mut self, id: ConnId, vote: Vote) {
-        self.users.get_mut(&id).map(|user| user.vote(vote.clone()));
+        let max_ord = self.users.values().map(|user| user.ord).max().unwrap_or(0);
+        self.users.get_mut(&id).map(|user| {
+            user.vote(vote.clone());
+            user.ord = max_ord + 1;
+        });
         self.send_message(id, OutboundMessage::YourVote(vote.into()));
         self.broadcast(self.votes_summary());
 
@@ -128,27 +134,50 @@ impl GameServer {
         let mut statuses = self
             .users
             .values()
-            .map(|user| (user.nickname.clone(), user.vote.status()))
-            .collect::<Vec<(String, VoteStatus)>>();
-        statuses.sort_by(|(a, _), (b, _)| a.cmp(b));
+            .map(|user| (user.nickname.clone(), user.vote.status(), user.ord))
+            .collect::<Vec<(String, VoteStatus, usize)>>();
+        statuses.sort_by(
+            |(_, status_a, ord_a), (_, status_b, ord_b)| match (status_a, status_b) {
+                (VoteStatus::NotVoted, _) => std::cmp::Ordering::Greater,
+                (_, VoteStatus::NotVoted) => std::cmp::Ordering::Less,
+                _ => ord_a.cmp(ord_b),
+            },
+        );
 
-        OutboundMessage::VotesStatus(statuses)
+        OutboundMessage::VotesStatus(
+            statuses
+                .iter()
+                .map(|(a, b, _)| (a.clone(), b.clone()))
+                .collect(),
+        )
     }
 
     fn vote_result_summary(&self) -> OutboundMessage {
         let mut votes = self
             .users
             .values()
-            .map(|user| (user.nickname.clone(), user.vote.clone()))
-            .collect::<Vec<(String, Vote)>>();
-        votes.sort_by(|(a, _), (b, _)| a.cmp(b));
+            .map(|user| (user.nickname.clone(), user.vote.clone(), user.ord))
+            .collect::<Vec<(String, Vote, usize)>>();
+        votes.sort_by(
+            |(_, vote_a, ord_a), (_, vote_b, ord_b)| match (vote_a, vote_b) {
+                (Vote::Null, _) => std::cmp::Ordering::Greater,
+                (_, Vote::Null) => std::cmp::Ordering::Less,
+                _ => ord_a.cmp(ord_b),
+            },
+        );
 
-        OutboundMessage::VotesResult(votes)
+        OutboundMessage::VotesResult(
+            votes
+                .iter()
+                .map(|(a, b, _)| (a.clone(), b.clone()))
+                .collect(),
+        )
     }
 
     fn reset_votes(&mut self) {
         self.users.iter_mut().for_each(|(_, user)| {
             user.vote = Vote::Null;
+            user.ord = 0;
         });
     }
 
@@ -343,7 +372,7 @@ mod tests {
             server.votes_summary(),
             OutboundMessage::VotesStatus(vec![
                 ("Player1".into(), VoteStatus::Voted),
-                ("Player2".into(), VoteStatus::NotVoted)
+                ("Player2".into(), VoteStatus::NotVoted),
             ])
         );
     }

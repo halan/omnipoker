@@ -133,7 +133,8 @@ body {
     font-size: 1rem;
     position: relative;
     transform: translateY(0);
-    transition: transform 0.3s ease;
+    opacity: 1;
+    transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
 .hand .card {
@@ -149,11 +150,12 @@ body {
     }
 }
 
-.stage .status .card {
+.stage .status li:last-child .card:not(.back),
+.stage .result li:last-child .card:not(.back) {
     animation: to-top 0.3s ease-out;
 }
 
-.stage .status .card.back {
+.stage .status li:last-child .card.back {
     animation: to-bottom 0.3s ease-out;
 }
 
@@ -161,6 +163,7 @@ body {
     from {
         transform: translateY(1em);
     }
+
     to {
         transform: translateY(0);
     }
@@ -172,16 +175,24 @@ body {
 
 @keyframes flip {
     from {
-        transform: rotateY(0deg);
+        opacity: 0;
+        transform: rotateY(-90deg);
     }
     to {
-        transform: rotateY(180deg);
+        opacity: 1;
+        transform: rotateY(0deg);
     }
 }
 
 .hand .card:hover {
     animation: none;
     transform: translateY(-1em);
+}
+
+.stage .status .card:not(.back):hover {
+    animation: none;
+    transform: translateY(1em) rotateZ(-20deg);
+    opacity: 0.5;
 }
 
 .card.back {
