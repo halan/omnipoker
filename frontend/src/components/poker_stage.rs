@@ -32,12 +32,12 @@ pub fn poker_stage(props: &Props) -> Html {
                         </div>
                     },
                     Stage::Status(statuses) => {
-                        let statuses = statuses
+                        let statuses_iter = statuses
                             .iter()
                             .filter(|(_, status)| *status == VoteStatus::Voted );
 
                         let you_voted = props.your_vote != Vote::Null &&
-                            statuses.clone().any(|(user, _)| user == props.nickname.as_ref().unwrap());
+                            statuses_iter.clone().any(|(user, _)| user == props.nickname.as_ref().unwrap());
 
                         html! {
                             <div>
@@ -52,7 +52,7 @@ pub fn poker_stage(props: &Props) -> Html {
                                                 html! {}
                                             }
                                         }
-                                        { for statuses
+                                        { for statuses_iter
                                             .filter(|(user, _)| {
                                                 if let Some(nickname) = &props.nickname {
                                                     user != nickname

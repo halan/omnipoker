@@ -142,7 +142,11 @@ pub async fn send_message(ws_stream: &mut WsStream, message: &str) {
         .expect("Failed to send message");
 }
 
-pub async fn expect_message(ws_stream: &mut WsStream, expected: &str, timeout_duration: Duration) {
+pub async fn expect_message(
+    receive_message: impl Fn(&str),
+    ws_stream: &mut WsStream,
+    timeout_duration: Duration,
+) {
     loop {
         match timeout(timeout_duration, ws_stream.next())
             .await
@@ -150,7 +154,7 @@ pub async fn expect_message(ws_stream: &mut WsStream, expected: &str, timeout_du
             .expect("Failed to read message")
         {
             Ok(Message::Text(text)) => {
-                assert_eq!(text, expected);
+                receive_message(&text);
                 return;
             }
             Ok(Message::Ping(_)) => {
@@ -163,51 +167,4 @@ pub async fn expect_message(ws_stream: &mut WsStream, expected: &str, timeout_du
             _ => panic!("Unexpected WebSocket message"),
         }
     }
-}
-
-pub async fn expect_messages(
-    ws_stream: &mut WsStream,
-    expected: Vec<&str>,
-    waiting_time: Duration,
-) {
-    for response in collect_messages(ws_stream, expected.len(), waiting_time)
-        .await
-        .iter()
-        .zip(expected.iter())
-    {
-        assert_eq!(response.0, response.1);
-    }
-}
-
-pub async fn collect_messages(
-    ws_stream: &mut WsStream,
-    count: usize,
-    timeout_duration: Duration,
-) -> Vec<String> {
-    let mut buffer = Vec::new();
-    let start_time = tokio::time::Instant::now();
-
-    while buffer.len() < count {
-        let elapsed = start_time.elapsed();
-        if elapsed >= timeout_duration {
-            break;
-        }
-
-        let remaining = timeout_duration - elapsed;
-
-        if let Ok(Some(Ok(Message::Text(response)))) = timeout(remaining, ws_stream.next()).await {
-            buffer.push(response);
-        }
-    }
-
-    if buffer.len() < count {
-        panic!(
-            "Expected {} messages but received {}\n {:?}",
-            count,
-            buffer.len(),
-            buffer
-        );
-    }
-
-    buffer
 }

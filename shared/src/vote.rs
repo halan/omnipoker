@@ -29,7 +29,7 @@ impl Serialize for Vote {
     where
         S: Serializer,
     {
-        let s: String = self.clone().into();
+        let s: String = self.clone().to_string();
         serializer.serialize_str(&s)
     }
 }
@@ -49,7 +49,7 @@ impl Serialize for VoteStatus {
     where
         S: Serializer,
     {
-        let s: String = self.clone().into();
+        let s: String = self.clone().to_string();
         serializer.serialize_str(&s)
     }
 }
@@ -78,12 +78,6 @@ impl From<usize> for Vote {
     }
 }
 
-impl From<Vote> for String {
-    fn from(val: Vote) -> Self {
-        val.to_string()
-    }
-}
-
 impl From<&str> for VoteStatus {
     fn from(value: &str) -> Self {
         match value {
@@ -96,12 +90,6 @@ impl From<&str> for VoteStatus {
 impl From<String> for VoteStatus {
     fn from(value: String) -> Self {
         VoteStatus::from(value.as_str())
-    }
-}
-
-impl From<VoteStatus> for String {
-    fn from(val: VoteStatus) -> Self {
-        val.to_string()
     }
 }
 

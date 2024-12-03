@@ -21,59 +21,134 @@ async fn test_integration_planning_poker_json() {
         .await
         .expect("Failed to connect to WebSocket");
 
-    send_message(&mut ws_stream_1, r#"{"connect":{"nickname":"Player1"}}"#).await;
+    send_message(
+        &mut ws_stream_1,
+        &json!({"connect": {"nickname": "Player1"}}).to_string(),
+    )
+    .await;
+
     expect_message(
+        |text| {
+            assert_eq!(
+                zerify_uuids_from_users_list(&text),
+                json!({"user_list": [{"id": "00", "nickname": "Player1"}]})
+            )
+        },
         &mut ws_stream_1,
-        r#"{"user_list":["Player1"]}"#,
         waiting_time,
     )
     .await;
 
-    send_message(&mut ws_stream_2, r#"{"connect":{"nickname":"Player2"}}"#).await;
+    send_message(
+        &mut ws_stream_2,
+        &json!({"connect": {"nickname": "Player2"}}).to_string(),
+    )
+    .await;
+
     expect_message(
+        |text| {
+            assert_eq!(
+                zerify_uuids_from_users_list(&text),
+                json!({"user_list":[{"id": "00", "nickname": "Player1"},{"id": "00", "nickname": "Player2"}]})
+            )
+        },
         &mut ws_stream_1,
-        r#"{"user_list":["Player1","Player2"]}"#,
         waiting_time,
     )
     .await;
 
-    send_message(&mut ws_stream_1, r#"{"vote": {"value": "1"}}"#).await;
-    expect_messages(
+    send_message(
         &mut ws_stream_1,
-        vec![
-            r#"{"your_vote":"1"}"#, // you vote
-            r#"{"votes_status":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
-        ],
-        waiting_time,
+        &json!({"vote": {"value": "1"}}).to_string(),
     )
     .await;
 
-    send_message(&mut ws_stream_2, r#"{"vote": {"value": "2"}}"#).await;
     expect_message(
+        |text| assert_eq!(&text, &json!({"your_vote": "1"}).to_string()),
         &mut ws_stream_1,
-        r#"{"votes_result":[["Player1","1"],["Player2","2"]]}"#,
         waiting_time,
     )
     .await;
 
-    send_message(&mut ws_stream_1, r#"{"vote": {"value": "4"}}"#).await;
-    expect_messages(
+    expect_message(
+        |text| {
+            assert_eq!(
+                &text,
+                &json!({"votes_status": [["Player1", "voted"], ["Player2", "not voted"]]})
+                    .to_string(),
+            )
+        },
         &mut ws_stream_1,
-        vec![
-            r#"{"your_vote":"not voted"}"#,
-            r#"{"votes_status":[["Player1","not voted"],["Player2","not voted"]]}"#,
-        ],
         waiting_time,
     )
     .await;
 
-    send_message(&mut ws_stream_1, r#"{"vote": {"value": "?"}}"#).await;
-    expect_messages(
+    send_message(
+        &mut ws_stream_2,
+        &json!({"vote": {"value": "2"}}).to_string(),
+    )
+    .await;
+
+    expect_message(
+        |text| {
+            assert_eq!(
+                &text,
+                &json!({"votes_result": [["Player1", "1"], ["Player2", "2"]]}).to_string()
+            )
+        },
         &mut ws_stream_1,
-        vec![
-            r#"{"your_vote":"?"}"#,
-            r#"{"votes_status":[["Player1","voted"],["Player2","not voted"]]}"#,
-        ],
+        waiting_time,
+    )
+    .await;
+
+    send_message(
+        &mut ws_stream_1,
+        &json!({"vote": {"value": "4"}}).to_string(),
+    )
+    .await;
+
+    expect_message(
+        |text| assert_eq!(&text, &json!({"your_vote": "not voted"}).to_string()),
+        &mut ws_stream_1,
+        waiting_time,
+    )
+    .await;
+
+    expect_message(
+        |text| {
+            assert_eq!(
+                &text,
+                &json!({"votes_status": [["Player1", "not voted"], ["Player2", "not voted"]]})
+                    .to_string()
+            )
+        },
+        &mut ws_stream_1,
+        waiting_time,
+    )
+    .await;
+
+    send_message(
+        &mut ws_stream_1,
+        &json!({"vote": {"value": "?"}}).to_string(),
+    )
+    .await;
+
+    expect_message(
+        |text| assert_eq!(&text, &json!({"your_vote": "?"}).to_string()),
+        &mut ws_stream_1,
+        waiting_time,
+    )
+    .await;
+
+    expect_message(
+        |text| {
+            assert_eq!(
+                &text,
+                &json!({"votes_status": [["Player1", "voted"], ["Player2", "not voted"]]})
+                    .to_string()
+            )
+        },
+        &mut ws_stream_1,
         waiting_time,
     )
     .await;
@@ -83,17 +158,84 @@ async fn test_integration_planning_poker_json() {
         .await
         .expect("Failed to close connection");
 
-    expect_messages(
+    expect_message(
+        |text| {
+            assert_eq!(
+                zerify_uuids_from_users_list(&text),
+                json!({"user_list":[{"id": "00", "nickname": "Player1"},{"id": "00", "nickname": "Player2"}]})
+            )
+        },
         &mut ws_stream_2,
-        vec![
-            r#"{"user_list":["Player1","Player2"]}"#, // update user list
-            r#"{"votes_status":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
-            r#"{"your_vote":"2"}"#,                   // you vote
-            r#"{"votes_result":[["Player1","1"],["Player2","2"]]}"#, // votes summary final
-            r#"{"votes_status":[["Player1","not voted"],["Player2","not voted"]]}"#, // votes summary
-            r#"{"votes_status":[["Player1","voted"],["Player2","not voted"]]}"#, // votes summary
-            r#"{"user_list":["Player2"]}"#,                                      // update user list
-        ],
+        waiting_time,
+    )
+    .await;
+
+    expect_message(
+        |text| {
+            assert_eq!(
+                &text,
+                &json!({"votes_status": [["Player1", "voted"], ["Player2", "not voted"]]})
+                    .to_string()
+            )
+        },
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+
+    expect_message(
+        |text| assert_eq!(&text, &json!({"your_vote": "2"}).to_string()),
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+
+    expect_message(
+        |text| {
+            assert_eq!(
+                &text,
+                &json!({"votes_result": [["Player1", "1"], ["Player2", "2"]]}).to_string()
+            )
+        },
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+
+    expect_message(
+        |text| {
+            assert_eq!(
+                &text,
+                &json!({"votes_status": [["Player1", "not voted"], ["Player2", "not voted"]]})
+                    .to_string()
+            )
+        },
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+
+    expect_message(
+        |text| {
+            assert_eq!(
+                &text,
+                &json!({"votes_status": [["Player1", "voted"], ["Player2", "not voted"]]})
+                    .to_string()
+            )
+        },
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+
+    expect_message(
+        |text| {
+            assert_eq!(
+                zerify_uuids_from_users_list(&text),
+                json!({"user_list": [{"id": "00", "nickname": "Player2"}]})
+            )
+        },
+        &mut ws_stream_2,
         waiting_time,
     )
     .await;

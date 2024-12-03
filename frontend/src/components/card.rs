@@ -43,15 +43,13 @@ pub fn card(props: &Props) -> Html {
     let on_vote = props.on_vote.clone();
     let vote = props.vote.clone();
 
-    let onclick = on_vote
-        .map(|callback| {
-            Callback::from(move |_| {
-                if let Some(vote_value) = vote.as_deref() {
-                    callback.emit(vote_value.to_string());
-                }
-            })
+    let onclick = on_vote.map(|callback| {
+        Callback::from(move |_| {
+            if let Some(vote_value) = vote.as_deref() {
+                callback.emit(vote_value.to_string());
+            }
         })
-        .unwrap_or_default();
+    });
 
     html! {
         <li>

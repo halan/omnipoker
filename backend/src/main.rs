@@ -5,7 +5,10 @@ use actix_web::{
 };
 use clap::Parser;
 use num_cpus;
-use std::sync::{Arc, Mutex};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 mod game;
 mod logger;
@@ -35,11 +38,15 @@ async fn main() -> std::io::Result<()> {
     let session_count = Arc::new(Mutex::new(0usize));
 
     HttpServer::new(move || {
-        App::new()
+        let app = App::new()
             .app_data(Data::new(game_handler.clone()))
             .app_data(Data::new(session_count.clone()))
-            .route("/ws", get().to(session::handler::<game::GameHandle>))
-            .service(Files::new("/", "./frontend/dist").index_file("index.html"))
+            .route("/ws", get().to(session::handler::<game::GameHandle>));
+
+        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let frontend_path = base_dir.join("../frontend/dist");
+
+        app.service(Files::new("/", frontend_path).index_file("index.html"))
     })
     .bind(addr)?
     .run()

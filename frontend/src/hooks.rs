@@ -1,6 +1,7 @@
 use crate::ws::{connect_websocket, send_message, WebSocketSink};
 pub use shared::{InboundMessage, OutboundMessage, Vote, VoteStatus};
 use std::borrow::Borrow;
+use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 #[derive(Clone, PartialEq)]
@@ -106,7 +107,7 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
         Callback::from(move |vote: String| {
             if let Some(sink) = &*ws_sink {
                 let sink = sink.clone();
-                wasm_bindgen_futures::spawn_local(async move {
+                spawn_local(async move {
                     let message = InboundMessage::Vote {
                         value: Vote::from(vote),
                     };
@@ -119,10 +120,10 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
     let on_remove_vote = {
         let ws_sink = ws_sink.clone();
 
-        Callback::from(move |_: String| {
+        Callback::from(move |_| {
             if let Some(sink) = &*ws_sink {
                 let sink = sink.clone();
-                wasm_bindgen_futures::spawn_local(async move {
+                spawn_local(async move {
                     let message = InboundMessage::Vote { value: Vote::Null };
                     send_message(&sink, &message).await;
                 });

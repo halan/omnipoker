@@ -1,4 +1,4 @@
-use helpers::{expect_message, expect_messages, send_message, ServerGuard};
+use helpers::{expect_message, send_message, ServerGuard};
 use tokio::{net::TcpStream, time::Duration};
 use tokio_tungstenite::{connect_async, tungstenite::Error, MaybeTlsStream, WebSocketStream};
 
@@ -22,45 +22,67 @@ async fn test_integration_planning_poker() {
         .expect("Failed to connect to WebSocket");
 
     send_message(&mut ws_stream_1, "/join Player1").await;
-    expect_message(&mut ws_stream_1, "Users: Player1", waiting_time).await;
+    expect_message(
+        |text| assert_eq!(text, "Users: Player1"),
+        &mut ws_stream_1,
+        waiting_time,
+    )
+    .await;
 
     send_message(&mut ws_stream_2, "/join Player2").await;
-    expect_message(&mut ws_stream_1, "Users: Player1, Player2", waiting_time).await;
+    expect_message(
+        |text| assert_eq!(text, "Users: Player1, Player2"),
+        &mut ws_stream_1,
+        waiting_time,
+    )
+    .await;
 
     send_message(&mut ws_stream_1, "1").await;
-    expect_messages(
+    expect_message(
+        |text| assert_eq!(text, "You voted: 1"),
         &mut ws_stream_1,
-        vec![
-            "You voted: 1",                              // you vote
-            "Votes: Player1: voted, Player2: not voted", // votes summary
-        ],
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
+        &mut ws_stream_1,
         waiting_time,
     )
     .await;
 
     send_message(&mut ws_stream_2, "2").await;
     expect_message(
+        |text| assert_eq!(text, "Votes: Player1: 1, Player2: 2"),
         &mut ws_stream_1,
-        "Votes: Player1: 1, Player2: 2",
         waiting_time,
     )
     .await;
 
     send_message(&mut ws_stream_1, "4").await;
-    expect_messages(
+    expect_message(
+        |text| assert_eq!(text, "You voted: not voted"),
         &mut ws_stream_1,
-        vec![
-            "You voted: not voted",
-            "Votes: Player1: not voted, Player2: not voted",
-        ],
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: not voted, Player2: not voted"),
+        &mut ws_stream_1,
         waiting_time,
     )
     .await;
 
     send_message(&mut ws_stream_1, "?").await;
-    expect_messages(
+    expect_message(
+        |text| assert_eq!(text, "You voted: ?"),
         &mut ws_stream_1,
-        vec!["You voted: ?", "Votes: Player1: voted, Player2: not voted"],
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
+        &mut ws_stream_1,
         waiting_time,
     )
     .await;
@@ -70,17 +92,45 @@ async fn test_integration_planning_poker() {
         .await
         .expect("Failed to close connection");
 
-    expect_messages(
+    expect_message(
+        |text| assert_eq!(text, "Users: Player1, Player2"),
         &mut ws_stream_2,
-        vec![
-            "Users: Player1, Player2",                       // update user list
-            "Votes: Player1: voted, Player2: not voted",     // votes summary
-            "You voted: 2",                                  // you vote
-            "Votes: Player1: 1, Player2: 2",                 // votes summary final
-            "Votes: Player1: not voted, Player2: not voted", // votes summary
-            "Votes: Player1: voted, Player2: not voted",     // votes summary
-            "Users: Player2",                                // update user list
-        ],
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "You voted: 2"),
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: 1, Player2: 2"),
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: not voted, Player2: not voted"),
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
+        &mut ws_stream_2,
+        waiting_time,
+    )
+    .await;
+    expect_message(
+        |text| assert_eq!(text, "Users: Player2"),
+        &mut ws_stream_2,
         waiting_time,
     )
     .await;
