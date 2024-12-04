@@ -6,6 +6,7 @@ use yew::prelude::*;
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
     pub stage: Stage,
+    pub is_rollback: bool,
     pub your_vote: Vote,
     pub nickname: Option<String>,
     pub on_remove_vote: Callback<String>,
@@ -39,9 +40,9 @@ pub fn poker_stage(props: &Props) -> Html {
                         html! {
                             <div>
                                 <div class="playingCards fourColours">
-                                    <ul class="table status">
+                                    <ul class={format!("table status{}", if props.is_rollback { " rollback" } else { "" } )}>
                                         { for statuses_iter
-                                            .map(|(user, _)|
+                                            .map(|(user, _)| {
                                                 if Some(user) == props.nickname.as_ref() {
                                                     html! {
                                                         <Card
@@ -55,7 +56,7 @@ pub fn poker_stage(props: &Props) -> Html {
                                                         <Card back={true} player={user.clone()} />
                                                     }
                                                 }
-                                            )
+                                            })
                                         }
                                     </ul>
                                 </div>

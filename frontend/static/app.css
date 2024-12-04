@@ -1,11 +1,26 @@
 body {
-    margin: 0;
+    margin: 10px;
+    min-width: 640px;
     font-family: Arial, sans-serif;
     background-color: #f9f9f9;
     color: #333;
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+.app-footer {
+    position: fixed;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #aaa;
+    background: transparent;
+    font-style: italic;
+    min-width: 700px;
 }
 
 .app {
@@ -150,12 +165,12 @@ body {
     }
 }
 
-.stage .status li:last-child .card:not(.back),
-.stage .result li:last-child .card:not(.back) {
+.stage .status:not(.rollback) li:last-child .card:not(.back),
+.stage .result:not(.rollback) li:last-child .card:not(.back) {
     animation: to-top 0.3s ease-out;
 }
 
-.stage .status li:last-child .card.back {
+.stage .status:not(.rollback) li:last-child .card.back {
     animation: to-bottom 0.3s ease-out;
 }
 
@@ -209,17 +224,4 @@ body {
     font-size: 0.9rem;
     color: #555;
     text-align: center;
-}
-
-.app-footer {
-    position: fixed;
-    bottom: 5px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: auto;
-    text-align: center;
-    font-size: 0.8rem;
-    color: #aaa;
-    background: transparent;
-    font-style: italic;
 }
