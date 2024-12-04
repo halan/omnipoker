@@ -59,7 +59,7 @@ impl GameServer {
         &mut self,
         tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
-    ) -> ConnId {
+    ) -> Result<ConnId, String> {
         info!("User identified: {}", nickname);
 
         // register session with random connection ID
@@ -70,13 +70,18 @@ impl GameServer {
             vote: Vote::Null,
             ord: 0,
         };
+
+        if self.users.values().any(|user| user.nickname == nickname) {
+            return Err("Nickname already in use".into());
+        }
+
         self.users.insert(id, user);
         self.broadcast(self.users_summary());
         if self.anyone_voted() {
             self.broadcast(self.votes_summary());
         }
 
-        id
+        Ok(id)
     }
 
     pub fn disconnect(&mut self, id: ConnId) {
@@ -210,21 +215,16 @@ impl GameServer {
                     nickname,
                     res_tx,
                 } => {
-                    let conn_id = self.connect(conn_tx, &nickname).await;
-                    let _ = res_tx.send(conn_id);
+                    let result = self.connect(conn_tx, &nickname).await;
+                    let _ = res_tx.send(result);
                 }
 
                 Command::Disconnect { conn_id } => {
                     self.disconnect(conn_id);
                 }
 
-                Command::Vote {
-                    conn_id,
-                    vote,
-                    res_tx,
-                } => {
+                Command::Vote { conn_id, vote } => {
                     self.vote(conn_id, vote);
-                    let _ = res_tx.send(conn_id);
                 }
 
                 #[cfg(test)]
@@ -243,7 +243,7 @@ pub enum Command {
     Connect {
         conn_tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: String,
-        res_tx: oneshot::Sender<ConnId>,
+        res_tx: oneshot::Sender<Result<ConnId, String>>,
     },
 
     Disconnect {
@@ -253,7 +253,6 @@ pub enum Command {
     Vote {
         conn_id: ConnId,
         vote: Vote,
-        res_tx: oneshot::Sender<ConnId>,
     },
 
     #[cfg(test)]
@@ -291,7 +290,7 @@ mod tests {
         server_task.await.expect("Server task did not complete");
     }
 
-    async fn connect_user(nickname: &str, handle: &GameHandle) -> ConnId {
+    async fn connect_user(nickname: &str, handle: &GameHandle) -> Result<ConnId, String> {
         let (tx, _rx) = mpsc::unbounded_channel();
         let (res_tx, res_rx) = oneshot::channel();
 
@@ -319,7 +318,7 @@ mod tests {
         shutdown_test_server(&handle, server_task).await;
 
         let server = server.lock().await;
-        assert!(server.users.contains_key(&conn_id));
+        assert!(server.users.contains_key(&conn_id.unwrap()));
         assert_eq!(
             server.users_summary(),
             OutboundMessage::UserList(vec!["Player1".into()])
@@ -332,13 +331,18 @@ mod tests {
 
         let conn_id = connect_user("Player1", &handle).await;
 
-        handle.cmd_tx.send(Command::Disconnect { conn_id }).unwrap();
+        handle
+            .cmd_tx
+            .send(Command::Disconnect {
+                conn_id: conn_id.clone().unwrap(),
+            })
+            .unwrap();
 
         // unlock the server
         shutdown_test_server(&handle, server_task).await;
         let server = server.lock().await;
 
-        assert!(!server.users.contains_key(&conn_id));
+        assert!(!server.users.contains_key(&conn_id.unwrap()));
         assert_eq!(server.users_summary(), OutboundMessage::UserList(vec![]));
     }
 
@@ -351,23 +355,22 @@ mod tests {
 
         let vote = Vote::Option(2);
 
-        let (vote_res_tx, vote_res_rx) = oneshot::channel();
         handle
             .cmd_tx
             .send(Command::Vote {
-                conn_id: conn_id,
+                conn_id: *conn_id.as_ref().unwrap(),
                 vote: vote.clone(),
-                res_tx: vote_res_tx,
             })
             .unwrap();
-
-        vote_res_rx.await.unwrap();
 
         // unlock the server
         shutdown_test_server(&handle, server_task).await;
         let server = server.lock().await;
 
-        assert_eq!(server.users.get(&conn_id).unwrap().vote, Vote::Option(2));
+        assert_eq!(
+            server.users.get(&conn_id.unwrap()).unwrap().vote,
+            Vote::Option(2)
+        );
         assert_eq!(
             server.votes_summary(),
             OutboundMessage::VotesStatus(vec![

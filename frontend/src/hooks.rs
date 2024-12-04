@@ -2,6 +2,7 @@ use crate::{
     state::{Stage, State, StateAction},
     ws::{connect_websocket, send_message, WebSocketSink},
 };
+use gloo_net::websocket::WebSocketError;
 use shared::{InboundMessage, OutboundMessage, Vote};
 use std::borrow::Borrow;
 use wasm_bindgen_futures::spawn_local;
@@ -26,7 +27,7 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
 
         Callback::from(move |event: InputEvent| {
             if let Some(input) = event.target_dyn_into::<web_sys::HtmlInputElement>() {
-                state.dispatch(StateAction::Connect(input.value()));
+                state.dispatch(StateAction::Connect(Some(input.value())));
             }
         })
     };
@@ -64,10 +65,14 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
                         }
                     },
                     {
+                        let state = state.clone();
                         // error
                         let ws_sink = ws_sink.clone();
-                        move |_| {
+                        move |err| {
                             ws_sink.set(None);
+                            if let WebSocketError::ConnectionClose(e) = err {
+                                state.dispatch(StateAction::ConnectError(e.reason));
+                            }
                         }
                     },
                 ) {

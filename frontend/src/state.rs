@@ -35,17 +35,26 @@ impl Stage {
 pub enum StateAction {
     Result(Stage),
     Status(Stage),
-    Connect(String),
+    Connect(Option<String>),
+    ConnectError(String),
     YourVote(Vote),
     UpdateUserList(Vec<String>),
+}
+
+#[derive(Clone, Debug)]
+pub enum Screens {
+    Home,
+    Game,
 }
 #[derive(Clone)]
 pub struct State {
     pub stage: Stage,
     pub nickname: Option<String>,
+    pub error_box: Option<String>,
     pub your_vote: Vote,
     pub is_rollback: bool,
     pub user_list: Vec<String>,
+    pub screen: Screens,
 }
 
 impl Default for State {
@@ -53,9 +62,11 @@ impl Default for State {
         Self {
             stage: Stage::Init,
             nickname: None,
+            error_box: None,
             your_vote: Vote::Null,
             is_rollback: false,
             user_list: Vec::new(),
+            screen: Screens::Home,
         }
     }
 }
@@ -80,6 +91,7 @@ impl Reducible for State {
                         VoteStatus::Voted => self.your_vote.clone(),
                         _ => Vote::Null,
                     },
+                    error_box: None,
                     ..(*self).clone()
                 }
             }
@@ -89,7 +101,13 @@ impl Reducible for State {
                 ..(*self).clone()
             },
             StateAction::Connect(nickname) => Self {
-                nickname: Some(nickname),
+                nickname: nickname,
+                ..(*self).clone()
+            },
+            StateAction::ConnectError(err) => Self {
+                nickname: None,
+                error_box: Some(err),
+                screen: Screens::Home,
                 ..(*self).clone()
             },
             StateAction::YourVote(vote) => Self {
@@ -98,6 +116,7 @@ impl Reducible for State {
             },
             StateAction::UpdateUserList(list) => Self {
                 user_list: list,
+                screen: Screens::Game,
                 ..(*self).clone()
             },
         }

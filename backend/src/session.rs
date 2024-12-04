@@ -1,6 +1,6 @@
 use crate::game::{CommandHandler, ConnId, Nickname, OutboundMessage};
 use actix_web::{web, web::Payload, HttpRequest, HttpResponse};
-use actix_ws::AggregatedMessage;
+use actix_ws::{AggregatedMessage, CloseReason};
 use futures_util::{
     future::{select, Either},
     StreamExt as _,
@@ -20,20 +20,38 @@ async fn handle_text_message<'a, T: CommandHandler>(
     conn_id: &mut Option<ConnId>,
     game_handler: &T,
     conn_tx: &mpsc::UnboundedSender<OutboundMessage>,
-) {
+) -> Result<(), String> {
     if nickname.is_none() {
         if let InboundMessage::Connect {
             nickname: new_nickname,
         } = inbound
         {
             *nickname = Some(new_nickname.clone());
-            *conn_id = game_handler
+            let result = game_handler
                 .connect(conn_tx.clone(), new_nickname.as_str())
-                .await
-                .ok();
+                .await;
+
+            match result {
+                Ok(Ok(new_conn_id)) => {
+                    *conn_id = Some(new_conn_id);
+                    return Ok(());
+                }
+                Err(err) => {
+                    log::error!("Failed to connect: {}", err);
+                    return Err(err.to_string());
+                }
+                Ok(Err(err)) => {
+                    log::error!("Failed to connect: {}", err);
+                    return Err(err);
+                }
+            }
         }
 
-        return;
+        return Ok(());
+    }
+
+    if nickname.is_none() {
+        return Err("Nickname is not set".to_string());
     }
 
     if let InboundMessage::Vote { value: vote } = inbound {
@@ -41,6 +59,8 @@ async fn handle_text_message<'a, T: CommandHandler>(
             game_handler.vote(conn_id.clone(), vote).await;
         }
     }
+
+    Ok(())
 }
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -99,7 +119,7 @@ pub async fn stream_handler<T: CommandHandler>(
                             _ => text.into(),
                         };
 
-                        handle_text_message(
+                        let result = handle_text_message(
                             &inbound,
                             &mut nickname,
                             &mut conn_id,
@@ -107,6 +127,14 @@ pub async fn stream_handler<T: CommandHandler>(
                             &conn_tx,
                         )
                         .await;
+
+                        if let Err(err) = result {
+                            log::error!("{}", err);
+                            break Some(CloseReason {
+                                code: 1008.into(),
+                                description: Some(err.to_owned()),
+                            });
+                        }
                     }
 
                     AggregatedMessage::Binary(_bin) => {
@@ -253,9 +281,9 @@ mod tests {
                 let conn_tx = conn_tx.clone();
                 move |conn, nick| conn.same_channel(&conn_tx) && nick == new_nickname
             })
-            .returning(move |_, _| Ok(conn_id_result));
+            .returning(move |_, _| Ok(Ok(conn_id_result)));
 
-        handle_text_message(
+        let _ = handle_text_message(
             &InboundMessage::Connect {
                 nickname: new_nickname.to_string(),
             },
@@ -278,7 +306,7 @@ mod tests {
             .with(eq(conn_id_result.clone()), eq(vote_text.clone()))
             .returning(|_, _| ());
 
-        handle_text_message(
+        let _ = handle_text_message(
             &InboundMessage::Vote {
                 value: vote_text.clone(),
             },

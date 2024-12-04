@@ -10,7 +10,7 @@ pub trait CommandHandler: Clone {
         &self,
         conn_tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
-    ) -> Result<ConnId, RecvError>;
+    ) -> Result<Result<ConnId, String>, RecvError>;
     fn disconnect(&self, id: ConnId);
     async fn vote(&self, id: ConnId, vote: &Vote);
 }
@@ -32,7 +32,7 @@ impl CommandHandler for GameHandle {
         &self,
         conn_tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
-    ) -> Result<ConnId, RecvError> {
+    ) -> Result<Result<ConnId, String>, RecvError> {
         let (res_tx, res_rx) = oneshot::channel();
 
         self.cmd_tx
@@ -53,17 +53,12 @@ impl CommandHandler for GameHandle {
     }
 
     async fn vote(&self, conn_id: ConnId, vote: &Vote) {
-        let (res_tx, res_rx) = oneshot::channel();
-
         self.cmd_tx
             .send(Command::Vote {
                 conn_id,
                 vote: vote.clone(),
-                res_tx,
             })
             .expect("Failed to send Command::Vote");
-
-        res_rx.await.expect("Failed to receive ConnId");
     }
 }
 
@@ -93,7 +88,7 @@ mod tests {
                 }) = cmd_rx.recv().await
                 {
                     assert_eq!(n, nickname);
-                    r.send(expected_connd_id).unwrap();
+                    r.send(Ok(expected_connd_id)).unwrap();
                 }
             }
         });
@@ -103,7 +98,7 @@ mod tests {
             .await
             .expect("Failed to receive ConnId");
 
-        assert_eq!(conn_id, expected_connd_id);
+        assert_eq!(conn_id, Ok(expected_connd_id));
     }
 
     #[tokio::test]
@@ -115,15 +110,9 @@ mod tests {
         let vote_value = Vote::new(2);
 
         tokio::spawn(async move {
-            if let Some(Command::Vote {
-                conn_id: id,
-                vote,
-                res_tx,
-            }) = cmd_rx.recv().await
-            {
+            if let Some(Command::Vote { conn_id: id, vote }) = cmd_rx.recv().await {
                 assert_eq!(id, conn_id);
                 assert_eq!(vote, Vote::Option(2));
-                res_tx.send(ConnId::new()).unwrap();
             }
         });
 

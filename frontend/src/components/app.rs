@@ -1,7 +1,10 @@
 use super::{
     connect_screen::ConnectScreen, hand::Hand, poker_stage::PokerStage, user_list::UserList,
 };
-use crate::hooks::{use_planning_poker, UsePlanningPokerReturn};
+use crate::{
+    hooks::{use_planning_poker, UsePlanningPokerReturn},
+    state::Screens,
+};
 use yew::prelude::*;
 
 const SERVER_ADDR: &str = "ws://127.0.0.1:8080/ws?mode=json";
@@ -21,15 +24,17 @@ pub fn app() -> Html {
         <div class="app">
             <h1 class="app-title">{ "Planning Poker" }</h1>
             {
-            match *ws_sink {
-                None => html! {
+            match (&*ws_sink, state.screen.clone()) {
+                (None, _) => html! {
                     <ConnectScreen
                         {connect_callback}
                         {on_nickname_change}
                         nickname={state.nickname.clone()}
+                        error_message={state.error_box.clone().unwrap_or_default()}
                     />
                 },
-                Some(_) => html! {
+                (Some(_), Screens::Home) => html! { <p>{"Loading..."}</p> },
+                (Some(_), Screens::Game) => html! {
                     <>
                         <PokerStage
                             stage={state.stage.clone()}
