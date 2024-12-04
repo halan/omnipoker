@@ -10,12 +10,8 @@ const SERVER_ADDR: &str = "ws://127.0.0.1:8080/ws?mode=json";
 #[function_component(App)]
 pub fn app() -> Html {
     let UsePlanningPokerReturn {
-        user_list,
-        your_vote,
-        stage,
-        is_rollback,
         ws_sink,
-        nickname,
+        state,
         on_nickname_change,
         connect_callback,
         on_vote,
@@ -31,14 +27,14 @@ pub fn app() -> Html {
                     <ConnectScreen
                         {connect_callback}
                         {on_nickname_change}
-                        nickname={(*nickname).clone()}
+                        nickname={state.nickname.clone()}
                     />
                 },
                 Some(_) => html! {
                     <>
-                        <PokerStage stage={stage.clone()} {is_rollback} your_vote={(*your_vote).clone()} nickname={(*nickname).clone()} {on_remove_vote} />
-                        <UserList user_list={(*user_list).clone()} nickname={(*nickname).clone()} />
-                        <Hand your_vote={(*your_vote).clone()} stage={stage.clone()} {on_vote} />
+                        <PokerStage stage={state.stage.clone()} is_rollback={state.is_rollback} your_vote={state.your_vote.clone()} nickname={state.nickname.clone()} {on_remove_vote} />
+                        <UserList user_list={state.user_list.clone()} nickname={state.nickname.clone()} />
+                        <Hand your_vote={state.your_vote.clone()} stage={state.stage.clone()} {on_vote} />
                     </>
                 },
             }

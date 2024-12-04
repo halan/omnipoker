@@ -21,15 +21,22 @@ impl Stage {
             _ => 0,
         }
     }
+
+    pub fn your_vote_status(&self, nickname: &Option<String>) -> VoteStatus {
+        match self {
+            Stage::Status(statuses) => statuses
+                .iter()
+                .find(|(user, _)| Some(user) == nickname.as_ref())
+                .map(|(_, status)| status.clone())
+                .unwrap_or(VoteStatus::NotVoted),
+            _ => VoteStatus::NotVoted,
+        }
+    }
 }
 
 pub struct UsePlanningPokerReturn {
-    pub user_list: UseStateHandle<Vec<String>>,
-    pub your_vote: UseStateHandle<Vote>,
-    pub stage: Stage,
-    pub is_rollback: bool,
+    pub state: State,
     pub ws_sink: UseStateHandle<Option<WebSocketSink>>,
-    pub nickname: UseStateHandle<Option<String>>,
     pub on_nickname_change: Callback<InputEvent>,
     pub connect_callback: Callback<SubmitEvent>,
     pub on_vote: Callback<String>,
@@ -39,19 +46,27 @@ pub struct UsePlanningPokerReturn {
 pub enum StateAction {
     Result(Stage),
     Status(Stage),
+    Connect(String),
+    YourVote(Vote),
+    UpdateUserList(Vec<String>),
 }
+#[derive(Clone)]
 pub struct State {
-    current_stage: Stage,
-    previous_stage: Stage,
+    pub stage: Stage,
     pub is_rollback: bool,
+    pub nickname: Option<String>,
+    pub your_vote: Vote,
+    pub user_list: Vec<String>,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            current_stage: Stage::Init,
-            previous_stage: Stage::Init,
+            stage: Stage::Init,
+            nickname: None,
+            your_vote: Vote::Null,
             is_rollback: false,
+            user_list: Vec::new(),
         }
     }
 }
@@ -62,68 +77,75 @@ impl Reducible for State {
     fn reduce(self: Rc<Self>, action: Self::Action) -> Rc<Self> {
         match action {
             StateAction::Status(new_stage) => {
-                let old_stage = self.current_stage.clone();
+                let old_stage = self.stage.clone();
                 Self {
-                    current_stage: new_stage.clone(),
-                    previous_stage: old_stage.clone(),
+                    stage: new_stage.clone(),
                     is_rollback: match (&new_stage, &old_stage) {
                         (new_stage @ Stage::Status(_), old_stage @ Stage::Status(_)) => {
                             new_stage.count_votes() < old_stage.count_votes()
                         }
                         _ => false,
                     },
+                    your_vote: match new_stage.your_vote_status(&self.nickname) {
+                        VoteStatus::Voted => self.your_vote.clone(),
+                        _ => Vote::Null,
+                    },
+                    ..(*self).clone()
                 }
-                .into()
             }
             StateAction::Result(new_stage) => Self {
-                current_stage: new_stage.clone(),
-                previous_stage: self.current_stage.clone(),
+                stage: new_stage.clone(),
                 is_rollback: false,
-            }
-            .into(),
+                ..(*self).clone()
+            },
+            StateAction::Connect(nickname) => Self {
+                nickname: Some(nickname),
+                ..(*self).clone()
+            },
+            StateAction::YourVote(vote) => Self {
+                your_vote: vote,
+                ..(*self).clone()
+            },
+            StateAction::UpdateUserList(list) => Self {
+                user_list: list,
+                ..(*self).clone()
+            },
         }
+        .into()
     }
 }
 
 #[hook]
 pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
-    // TODO - move all state to the State struct
-    let user_list = use_state(Vec::new);
-    let your_vote = use_state(|| Vote::Null);
     let ws_sink = use_state(|| None);
-    let nickname = use_state(|| None);
-
     let state = use_reducer(State::default);
 
     let on_nickname_change = {
-        let nickname = nickname.clone();
+        let state = state.clone();
+
         Callback::from(move |event: InputEvent| {
             if let Some(input) = event.target_dyn_into::<web_sys::HtmlInputElement>() {
-                nickname.set(Some(input.value()));
+                state.dispatch(StateAction::Connect(input.value()));
             }
         })
     };
 
     let connect_callback = {
         let ws_sink = ws_sink.clone();
-        let user_list = user_list.clone();
-        let your_vote = your_vote.clone();
         let state = state.clone();
-        let nickname = nickname.clone();
 
         Callback::from(move |_| {
-            let user_list = user_list.clone();
-            let your_vote = your_vote.clone();
             let state = state.clone();
-            let nickname = nickname.clone();
 
             if ws_sink.borrow().is_none() {
                 if let Some(sink) = connect_websocket(
                     server_addr,
                     {
+                        let state = state.clone();
+
                         move |outbound| match outbound {
                             OutboundMessage::UserList(list) => {
-                                user_list.set(list);
+                                state.dispatch(StateAction::UpdateUserList(list));
                             }
 
                             OutboundMessage::VotesResult(results) => {
@@ -135,7 +157,7 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
                             }
 
                             OutboundMessage::YourVote(vote) => {
-                                your_vote.set(vote);
+                                state.dispatch(StateAction::YourVote(vote));
                             }
                             _ => {}
                         }
@@ -149,9 +171,10 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
                     },
                 ) {
                     ws_sink.set(Some(sink.clone()));
+                    let state = state.clone();
 
                     wasm_bindgen_futures::spawn_local(async move {
-                        if let Some(nickname) = &*nickname {
+                        if let Some(nickname) = state.nickname.clone() {
                             let message = InboundMessage::Connect {
                                 nickname: nickname.to_string(),
                             };
@@ -194,12 +217,8 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
     };
 
     UsePlanningPokerReturn {
-        user_list,
-        your_vote,
-        stage: state.current_stage.clone(),
-        is_rollback: state.is_rollback,
+        state: (*state).clone(),
         ws_sink,
-        nickname,
         on_nickname_change,
         connect_callback,
         on_vote,
