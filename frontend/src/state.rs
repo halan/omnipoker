@@ -1,4 +1,4 @@
-pub use shared::{Vote, VoteStatus};
+use shared::{Vote, VoteStatus};
 use std::rc::Rc;
 use yew::prelude::*;
 

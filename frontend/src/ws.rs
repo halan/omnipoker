@@ -1,6 +1,6 @@
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message, WebSocketError};
-pub use shared::{InboundMessage, OutboundMessage};
+use shared::{InboundMessage, OutboundMessage};
 use std::{cell::RefCell, rc::Rc};
 pub type WebSocketSink = Rc<RefCell<SplitSink<WebSocket, Message>>>;
 
@@ -17,7 +17,7 @@ pub fn connect_websocket(
             match msg {
                 Ok(Message::Text(text)) => {
                     let outbound = serde_json::from_str(&text).unwrap_or(OutboundMessage::Unknown);
-                    log::info!("Message: {}", text);
+                    log::info!("<- {}", text);
                     on_message(outbound);
                 }
                 Err(err) => {
@@ -35,7 +35,7 @@ pub fn connect_websocket(
 
 pub async fn send_message(sink: &WebSocketSink, inbound: &InboundMessage) {
     if let Ok(message) = serde_json::to_string(inbound) {
-        log::info!("Sending message: {}", message);
+        log::info!("-> {}", message);
 
         let mut sink = sink.borrow_mut();
         let send_result = sink.send(Message::Text(message)).await;

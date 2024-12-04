@@ -1,4 +1,4 @@
-use yew::{function_component, html, Callback, Html, Properties};
+use yew::{classes, function_component, html, Callback, Html, Properties};
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
@@ -14,35 +14,48 @@ pub struct Props {
     pub on_vote: Option<Callback<String>>,
 }
 
-#[function_component(Card)]
-pub fn card(props: &Props) -> Html {
-    let rank = match props.vote {
-        Some(ref value) if value == "?" => "-",
-        Some(ref value) if value == "1" => "A",
-        Some(ref value) if value == "2" => "2",
-        Some(ref value) if value == "3" => "3",
-        Some(ref value) if value == "5" => "5",
-        Some(ref value) if value == "8" => "8",
-        Some(ref value) if value == "13" => "K",
+fn vote_to_rank(vote: &str) -> &str {
+    match vote {
+        "?" => "-",
+        "1" => "A",
+        "2" => "2",
+        "3" => "3",
+        "5" => "5",
+        "8" => "8",
+        "13" => "K",
         _ => "-",
-    };
+    }
+}
 
-    let suit = match props.vote {
-        Some(ref value) if value == "?" => "joker",
-        Some(ref value) if value == "1" || value == "8" => "hearts",
-        Some(ref value) if value == "2" || value == "13" => "spades",
-        Some(ref value) if value == "3" => "diams",
-        Some(ref value) if value == "5" => "clubs",
+fn vote_to_suite(vote: &str) -> &str {
+    match vote {
+        "?" => "joker",
+        "1" | "8" => "hearts",
+        "2" | "13" => "spades",
+        "3" => "diams",
+        "5" => "clubs",
         _ => "-",
-    };
+    }
+}
 
-    let suit_symbol = match suit {
+fn suit_to_symbol(suit: &str) -> &str {
+    match suit {
         "spades" => "♠",
         "hearts" => "♥",
         "diams" => "♦",
         "clubs" => "♣",
         _ => "",
-    };
+    }
+}
+
+#[function_component(Card)]
+pub fn card(props: &Props) -> Html {
+    let rank = vote_to_rank(&props.vote.as_deref().unwrap_or("-"));
+    let suit = vote_to_suite(&props.vote.as_deref().unwrap_or("-"));
+    let suit_symbol = suit_to_symbol(suit);
+    let rank_class = format!("rank-{}", rank.to_lowercase());
+    let suit_class = suit.to_lowercase();
+    let your_class = if props.your { "your" } else { "" };
 
     let on_vote = props.on_vote.clone();
     let vote = props.vote.clone();
@@ -60,11 +73,7 @@ pub fn card(props: &Props) -> Html {
             {
                 match props.on_vote {
                     Some(_) => html! {
-                        <a
-                            class={format!("card rank-{} {}", rank.to_lowercase(), suit.to_lowercase())}
-                            href="#"
-                            {onclick}
-                        >
+                        <a class={classes!("card", rank_class, suit_class)} href="#" {onclick}>
                             <span class="rank">{ rank }</span>
                             <span class="suit">{ suit_symbol }</span>
                         </a>
@@ -76,12 +85,7 @@ pub fn card(props: &Props) -> Html {
                             }
                         } else {
                             html! {
-                                <div class={format!(
-                                    "card rank-{} {} {}",
-                                    rank.to_lowercase(),
-                                    suit.to_lowercase(),
-                                    if props.your { "your" } else { "" }
-                                )}>
+                                <div class={classes!("card", rank_class, suit_class, your_class)}>
                                     <span class="rank">{ rank }</span>
                                     <span class="suit">{ suit_symbol }</span>
                                 </div>

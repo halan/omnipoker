@@ -2,7 +2,7 @@ use crate::{
     state::{Stage, State, StateAction},
     ws::{connect_websocket, send_message, WebSocketSink},
 };
-pub use shared::{InboundMessage, OutboundMessage, Vote};
+use shared::{InboundMessage, OutboundMessage, Vote};
 use std::borrow::Borrow;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;

@@ -1,5 +1,4 @@
-pub use crate::components::app::App;
-
+pub use app::App;
 pub mod app;
 pub mod card;
 pub mod connect_screen;

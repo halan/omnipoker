@@ -40,7 +40,7 @@ pub fn poker_stage(props: &Props) -> Html {
                         html! {
                             <div>
                                 <div class="playingCards fourColours">
-                                    <ul class={format!("table status{}", if props.is_rollback { " rollback" } else { "" } )}>
+                                    <ul class={classes!("table", "status", if props.is_rollback { "rollback" } else { "" })}>
                                         { for statuses_iter
                                             .map(|(user, _)| {
                                                 if Some(user) == props.nickname.as_ref() {
