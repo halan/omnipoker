@@ -76,9 +76,7 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
 
                     spawn_local(async move {
                         if let Some(nickname) = state.nickname.clone() {
-                            let message = InboundMessage::Connect {
-                                nickname: nickname.to_string(),
-                            };
+                            let message = InboundMessage::Connect { nickname };
                             send_message(&sink, &message).await;
                         }
                     });
