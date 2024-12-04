@@ -1,5 +1,5 @@
 use super::card::Card;
-use crate::hooks::Stage;
+use crate::state::Stage;
 use shared::{Vote, VoteStatus};
 use yew::prelude::*;
 

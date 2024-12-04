@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 mod components;
 mod hooks;
+mod state;
 mod ws;
 
 #[wasm_bindgen(start)]

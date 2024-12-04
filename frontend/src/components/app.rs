@@ -2,7 +2,6 @@ use super::{
     connect_screen::ConnectScreen, hand::Hand, poker_stage::PokerStage, user_list::UserList,
 };
 use crate::hooks::{use_planning_poker, UsePlanningPokerReturn};
-
 use yew::prelude::*;
 
 const SERVER_ADDR: &str = "ws://127.0.0.1:8080/ws?mode=json";
@@ -10,8 +9,8 @@ const SERVER_ADDR: &str = "ws://127.0.0.1:8080/ws?mode=json";
 #[function_component(App)]
 pub fn app() -> Html {
     let UsePlanningPokerReturn {
-        ws_sink,
         state,
+        ws_sink,
         on_nickname_change,
         connect_callback,
         on_vote,
@@ -32,7 +31,13 @@ pub fn app() -> Html {
                 },
                 Some(_) => html! {
                     <>
-                        <PokerStage stage={state.stage.clone()} is_rollback={state.is_rollback} your_vote={state.your_vote.clone()} nickname={state.nickname.clone()} {on_remove_vote} />
+                        <PokerStage
+                            stage={state.stage.clone()}
+                            is_rollback={state.is_rollback}
+                            your_vote={state.your_vote.clone()}
+                            nickname={state.nickname.clone()}
+                            {on_remove_vote}
+                        />
                         <UserList user_list={state.user_list.clone()} nickname={state.nickname.clone()} />
                         <Hand your_vote={state.your_vote.clone()} stage={state.stage.clone()} {on_vote} />
                     </>
