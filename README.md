@@ -5,6 +5,7 @@ A simple planning poker server
 ## Warning
 
 ⚠️ **Experimental Project**
+
 This is just my very first Rust experience. I'm writing it as a way to stablish the knowledge that I just acquired learning "The Rust Programming Language". Anyway, feel free to copy, learn, compile and use whatever you want. I also would appreciate a PR.
 
 ## Quick Instructions
