@@ -228,4 +228,33 @@ body {
     font-size: 0.9rem;
     color: #555;
     text-align: center;
+    width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+p.loading {
+    text-align: center;
+    font-size: 1.5rem;
+    color: #555;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.5;
+    }
+}
+
+.connect-screen p.error {
+    color: red;
+    font-size: 1rem;
+    text-align: center;
 }

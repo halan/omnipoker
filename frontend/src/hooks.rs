@@ -38,6 +38,12 @@ pub fn use_planning_poker() -> UsePlanningPokerReturn {
 
         Callback::from(move |event: SubmitEvent| {
             let state = state.clone();
+            if state.nickname.is_none() {
+                state.dispatch(StateAction::ConnectError(
+                    "Nickname is required".to_string(),
+                ));
+                return;
+            }
             event.prevent_default();
 
             if ws_sink.borrow().is_none() {
@@ -79,8 +85,11 @@ pub fn use_planning_poker() -> UsePlanningPokerReturn {
                     ws_sink.set(Some(sink.clone()));
                     let state = state.clone();
 
+                    log::info!("Connected to websocket");
                     spawn_local(async move {
+                        log::info!("Sending nickname");
                         if let Some(nickname) = state.nickname.clone() {
+                            log::info!("Sending nickname: {}", nickname);
                             let message = InboundMessage::Connect { nickname };
                             send_message(&sink, &message).await;
                         }

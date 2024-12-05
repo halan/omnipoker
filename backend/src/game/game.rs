@@ -1,5 +1,4 @@
 use super::command_handle::*;
-use log::info;
 use shared::VoteStatus;
 pub use shared::{OutboundMessage, Vote};
 use std::{collections::HashMap, io};
@@ -42,7 +41,7 @@ pub struct GameServer {
 
 impl GameServer {
     pub fn new() -> (Self, GameHandle) {
-        info!("Game started");
+        log::info!("Game started");
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
@@ -60,20 +59,34 @@ impl GameServer {
         tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
     ) -> Result<ConnId, String> {
-        info!("User identified: {}", nickname);
+        log::info!("User identified: {}", nickname);
+        let nickname = nickname.trim();
+
+        if nickname.is_empty() {
+            log::error!("Nickname cannot be empty: {}", nickname);
+            return Err("Nickname cannot be empty".into());
+        }
+
+        if self.users.values().any(|user| user.nickname == nickname) {
+            log::error!("Nickname already in use: {}", nickname);
+            return Err("Nickname already in use".into());
+        }
+
+        let nickname = if nickname.len() > 20usize {
+            log::warn!("Nickname too long, truncating: {}", nickname);
+            nickname[..20].to_string()
+        } else {
+            nickname.to_string()
+        };
 
         // register session with random connection ID
         let id = ConnId::new();
         let user = User {
-            nickname: nickname.to_owned(),
+            nickname: nickname.clone(),
             tx,
             vote: Vote::Null,
             ord: 0,
         };
-
-        if self.users.values().any(|user| user.nickname == nickname) {
-            return Err("Nickname already in use".into());
-        }
 
         self.users.insert(id, user);
         self.broadcast(self.users_summary());
@@ -85,7 +98,7 @@ impl GameServer {
     }
 
     pub fn disconnect(&mut self, id: ConnId) {
-        info!(
+        log::info!(
             "User disconnected: {}",
             self.users.get(&id).map_or("<None>", |user| &user.nickname)
         );

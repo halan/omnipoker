@@ -33,6 +33,7 @@ pub fn connect_websocket(
 
 pub async fn send_message(sink: &WebSocketSink, inbound: &InboundMessage) {
     if let Ok(message) = serde_json::to_string(inbound) {
+        log::info!("Sending message: {}", message);
         let mut sink = sink.borrow_mut();
         let send_result = sink.send(Message::Text(message)).await;
 

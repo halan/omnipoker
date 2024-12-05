@@ -18,9 +18,10 @@ pub fn connect_screen(props: &Props) -> Html {
                         type="text"
                         placeholder="Enter your nickname"
                         oninput={props.on_nickname_change.clone()}
+                        maxlength="20"
                         value={props.nickname.clone()}
                     />
-                    <p>{ props.error_message.clone() }</p>
+                    <p class="error">{ props.error_message.clone() }</p>
                 </form>
             </div>
         </div>

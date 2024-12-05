@@ -31,7 +31,7 @@ pub fn app() -> Html {
                         error_message={state.error_box.clone().unwrap_or_default()}
                     />
                 },
-                (Some(_), Screens::Home) => html! { <p>{"Loading..."}</p> },
+                (Some(_), Screens::Home) => html! { <p class="loading">{"Loading..."}</p> },
                 (Some(_), Screens::Game) => html! {
                     <>
                         <PokerStage
