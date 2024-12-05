@@ -157,8 +157,8 @@ impl GameServer {
         statuses.sort_by(|(nick_a, status_a, ord_a), (nick_b, status_b, ord_b)| {
             match (status_a, status_b) {
                 (VoteStatus::NotVoted, VoteStatus::NotVoted) => nick_a.cmp(nick_b),
-                (VoteStatus::NotVoted, _) => std::cmp::Ordering::Greater,
-                (_, VoteStatus::NotVoted) => std::cmp::Ordering::Less,
+                (VoteStatus::NotVoted, _) => Ordering::Greater,
+                (_, VoteStatus::NotVoted) => Ordering::Less,
                 _ => ord_a.cmp(ord_b),
             }
         });
