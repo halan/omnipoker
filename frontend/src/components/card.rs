@@ -1,4 +1,4 @@
-use yew::{classes, function_component, html, Callback, Html, Properties};
+use yew::{classes, function_component, html, Callback, Html, MouseEvent, Properties};
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
@@ -61,7 +61,9 @@ pub fn card(props: &Props) -> Html {
     let vote = props.vote.clone();
 
     let onclick = on_vote.map(|callback| {
-        Callback::from(move |_| {
+        Callback::from(move |event: MouseEvent| {
+            event.prevent_default();
+
             if let Some(vote_value) = vote.as_deref() {
                 callback.emit(vote_value.to_string());
             }
@@ -73,7 +75,7 @@ pub fn card(props: &Props) -> Html {
             {
                 match props.on_vote {
                     Some(_) => html! {
-                        <a class={classes!("card", rank_class, suit_class)} href="#" {onclick}>
+                        <a class={classes!("card", rank_class, suit_class)} {onclick}>
                             <span class="rank">{ rank }</span>
                             <span class="suit">{ suit_symbol }</span>
                         </a>

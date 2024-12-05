@@ -38,13 +38,13 @@ pub fn use_planning_poker() -> UsePlanningPokerReturn {
 
         Callback::from(move |event: SubmitEvent| {
             let state = state.clone();
+            event.prevent_default();
             if state.nickname.is_none() {
                 state.dispatch(StateAction::ConnectError(
                     "Nickname is required".to_string(),
                 ));
                 return;
             }
-            event.prevent_default();
 
             if ws_sink.borrow().is_none() {
                 if let Some(sink) = connect_websocket(

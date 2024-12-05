@@ -1,7 +1,7 @@
 use super::command_handle::*;
 use shared::VoteStatus;
 pub use shared::{OutboundMessage, Vote};
-use std::{collections::HashMap, io};
+use std::{cmp::Ordering, collections::HashMap, io};
 use tokio::sync::{mpsc, oneshot};
 
 use uuid::Uuid;
@@ -154,13 +154,14 @@ impl GameServer {
             .values()
             .map(|user| (user.nickname.clone(), user.vote.status(), user.ord))
             .collect::<Vec<(String, VoteStatus, usize)>>();
-        statuses.sort_by(
-            |(_, status_a, ord_a), (_, status_b, ord_b)| match (status_a, status_b) {
+        statuses.sort_by(|(nick_a, status_a, ord_a), (nick_b, status_b, ord_b)| {
+            match (status_a, status_b) {
+                (VoteStatus::NotVoted, VoteStatus::NotVoted) => nick_a.cmp(nick_b),
                 (VoteStatus::NotVoted, _) => std::cmp::Ordering::Greater,
                 (_, VoteStatus::NotVoted) => std::cmp::Ordering::Less,
                 _ => ord_a.cmp(ord_b),
-            },
-        );
+            }
+        });
 
         OutboundMessage::VotesStatus(
             statuses
@@ -176,13 +177,7 @@ impl GameServer {
             .values()
             .map(|user| (user.nickname.clone(), user.vote.clone(), user.ord))
             .collect::<Vec<(String, Vote, usize)>>();
-        votes.sort_by(
-            |(_, vote_a, ord_a), (_, vote_b, ord_b)| match (vote_a, vote_b) {
-                (Vote::Null, _) => std::cmp::Ordering::Greater,
-                (_, Vote::Null) => std::cmp::Ordering::Less,
-                _ => ord_a.cmp(ord_b),
-            },
-        );
+        votes.sort_by(|(_, _, ord_a), (_, _, ord_b)| ord_a.cmp(ord_b));
 
         OutboundMessage::VotesResult(
             votes
