@@ -1,4 +1,4 @@
-use crate::{game::GameHandle, session::stream_handler};
+use crate::{game::GameHandle, session};
 use actix_web::{
     get,
     web::{self, Payload},
@@ -65,7 +65,7 @@ pub async fn handler(
 
     let session_count = session_count.clone();
     spawn_local(async move {
-        stream_handler(
+        session::init(
             (*game_handler.get_ref()).clone(),
             session,
             msg_stream,

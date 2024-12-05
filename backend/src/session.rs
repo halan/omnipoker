@@ -50,10 +50,6 @@ async fn handle_text_message(
         return Ok(());
     }
 
-    if nickname.is_none() {
-        return Err("Nickname is not set".to_string());
-    }
-
     if let InboundMessage::Vote { value: vote } = inbound {
         if let Some(conn_id) = conn_id {
             game_handler.vote(conn_id.clone(), vote).await;
@@ -66,7 +62,7 @@ async fn handle_text_message(
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
-pub async fn stream_handler(
+pub async fn init(
     game_handler: GameHandle,
     mut session: actix_ws::Session,
     msg_stream: actix_ws::MessageStream,
