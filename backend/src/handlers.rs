@@ -3,11 +3,9 @@ use crate::{
     limit::{release_session, try_acquire_session, Limit},
     session,
 };
-use actix_web::{
-    get,
-    web::{self, Payload},
-    HttpRequest, HttpResponse,
-};
+use actix_web::{get, web, HttpResponse, Responder};
+use actix_web::{web::Payload, HttpRequest};
+use rust_embed::RustEmbed;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use tokio::task::spawn_local;
@@ -25,7 +23,7 @@ pub struct QueryParams {
 }
 
 #[get("/ws")]
-pub async fn handler(
+pub async fn ws(
     req: HttpRequest,
     stream: Payload,
     game_handler: web::Data<GameHandle>,
@@ -50,4 +48,26 @@ pub async fn handler(
     });
 
     Ok(res)
+}
+
+#[derive(RustEmbed)]
+#[folder = "$CARGO_MANIFEST_DIR/../frontend/dist"]
+struct Assets;
+
+#[get("/{filename:.*}")]
+pub async fn assets(filename: web::Path<String>) -> impl Responder {
+    let filename = if filename == web::Path::from("".to_owned()) {
+        "index.html"
+    } else {
+        &*filename
+    };
+    if let Some(content) = Assets::get(&filename) {
+        let body = content.data;
+        let mime_type = mime_guess::from_path(&*filename).first_or_text_plain();
+        HttpResponse::Ok()
+            .content_type(mime_type.as_ref())
+            .body(body)
+    } else {
+        HttpResponse::NotFound().body("404 - Not Found")
+    }
 }

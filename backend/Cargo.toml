@@ -18,13 +18,13 @@ rand = "0.8"
 tokio = { version = "1.24.2", features = ["sync", "io-util", "full"] }
 tokio-util = "0.7.4"
 chrono = "0.4"
-num_cpus = "1.15"
 uuid = { version = "1.11", features = ["v4"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rust-embed = { version = "8.5.0", features = ["interpolate-folder-path"] }
 mime_guess = "2.0"
 shared = { path = "../shared" }
+colored = "2.0"
 
 [dev-dependencies]
 mockall = "0.13"

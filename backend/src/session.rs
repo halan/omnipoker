@@ -1,6 +1,6 @@
 use crate::{
     game::{ConnId, GameHandle, Nickname, OutboundMessage},
-    ws::Mode,
+    handlers::Mode,
 };
 use actix_ws::{AggregatedMessage, CloseReason};
 use futures_util::{

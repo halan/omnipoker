@@ -1,6 +1,10 @@
 use actix_web::web;
-use std::sync::{Arc, Mutex};
+use std::{
+    ffi::OsString,
+    sync::{Arc, Mutex},
+};
 
+#[derive(Clone)]
 pub struct Limit {
     pub count: usize,
     pub max: usize,
@@ -23,6 +27,24 @@ impl Limit {
 
     pub fn decrement(&mut self) {
         self.count -= 1;
+    }
+}
+
+impl From<OsString> for Limit {
+    fn from(s: OsString) -> Self {
+        match s.into_string() {
+            Ok(s) => match s.parse() {
+                Ok(max) => Self::new(max),
+                Err(_) => Self::default(),
+            },
+            Err(_) => Self::default(),
+        }
+    }
+}
+
+impl Default for Limit {
+    fn default() -> Self {
+        Self::new(15)
     }
 }
 
