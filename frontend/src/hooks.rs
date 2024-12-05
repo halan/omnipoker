@@ -18,7 +18,7 @@ pub struct UsePlanningPokerReturn {
 }
 
 #[hook]
-pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
+pub fn use_planning_poker() -> UsePlanningPokerReturn {
     let ws_sink = use_state(|| None);
     let state = use_reducer(State::default);
 
@@ -36,12 +36,12 @@ pub fn use_planning_poker(server_addr: &'static str) -> UsePlanningPokerReturn {
         let ws_sink = ws_sink.clone();
         let state = state.clone();
 
-        Callback::from(move |_| {
+        Callback::from(move |event: SubmitEvent| {
             let state = state.clone();
+            event.prevent_default();
 
             if ws_sink.borrow().is_none() {
                 if let Some(sink) = connect_websocket(
-                    server_addr,
                     {
                         let state = state.clone();
 

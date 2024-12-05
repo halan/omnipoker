@@ -4,31 +4,13 @@ use tokio::sync::{
     oneshot::{self, error::RecvError},
 };
 
-#[cfg_attr(test, mockall::automock)]
-pub trait CommandHandler: Clone {
-    async fn connect(
-        &self,
-        conn_tx: mpsc::UnboundedSender<OutboundMessage>,
-        nickname: &str,
-    ) -> Result<Result<ConnId, String>, RecvError>;
-    fn disconnect(&self, id: ConnId);
-    async fn vote(&self, id: ConnId, vote: &Vote);
-}
-
-#[cfg(test)]
-impl Clone for MockCommandHandler {
-    fn clone(&self) -> Self {
-        MockCommandHandler::new()
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct GameHandle {
     pub cmd_tx: mpsc::UnboundedSender<Command>,
 }
 
-impl CommandHandler for GameHandle {
-    async fn connect(
+impl GameHandle {
+    pub async fn connect(
         &self,
         conn_tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
@@ -46,13 +28,13 @@ impl CommandHandler for GameHandle {
         res_rx.await
     }
 
-    fn disconnect(&self, conn_id: ConnId) {
+    pub fn disconnect(&self, conn_id: ConnId) {
         self.cmd_tx
             .send(Command::Disconnect { conn_id })
             .expect("Failed to send Command::Disconnect");
     }
 
-    async fn vote(&self, conn_id: ConnId, vote: &Vote) {
+    pub async fn vote(&self, conn_id: ConnId, vote: &Vote) {
         self.cmd_tx
             .send(Command::Vote {
                 conn_id,

@@ -7,8 +7,6 @@ use crate::{
 };
 use yew::prelude::*;
 
-const SERVER_ADDR: &str = "ws://127.0.0.1:8080/ws?mode=json";
-
 #[function_component(App)]
 pub fn app() -> Html {
     let UsePlanningPokerReturn {
@@ -18,7 +16,7 @@ pub fn app() -> Html {
         connect_callback,
         on_vote,
         on_remove_vote,
-    } = use_planning_poker(SERVER_ADDR);
+    } = use_planning_poker();
 
     html! {
         <div class="app">

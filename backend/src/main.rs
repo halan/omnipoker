@@ -1,18 +1,13 @@
-use actix_files::Files;
-use actix_web::{
-    web::{get, Data},
-    App, HttpServer,
-};
+use actix_web::{web::Data, App, HttpServer};
 use clap::Parser;
 use num_cpus;
-use std::{
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
+mod frontend;
 mod game;
 mod logger;
 mod session;
+mod ws;
 
 #[derive(clap::Parser)]
 #[command(version, about, long_about = None)]
@@ -38,15 +33,11 @@ async fn main() -> std::io::Result<()> {
     let session_count = Arc::new(Mutex::new(0usize));
 
     HttpServer::new(move || {
-        let app = App::new()
+        App::new()
             .app_data(Data::new(game_handler.clone()))
             .app_data(Data::new(session_count.clone()))
-            .route("/ws", get().to(session::handler::<game::GameHandle>));
-
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let frontend_path = base_dir.join("../frontend/dist");
-
-        app.service(Files::new("/", frontend_path).index_file("index.html"))
+            .service(ws::handler)
+            .service(frontend::assets)
     })
     .bind(addr)?
     .run()
