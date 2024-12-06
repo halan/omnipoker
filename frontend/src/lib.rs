@@ -8,7 +8,6 @@ mod ws;
 
 #[wasm_bindgen(start)]
 pub fn run_app() {
-    #[cfg(debug_assertions)]
     wasm_logger::init(wasm_logger::Config::default());
     yew::Renderer::<App>::new().render();
 }

@@ -4,6 +4,8 @@ use colored::*;
 use env_logger::{Builder, Env, Target};
 use std::io::Write;
 
+use crate::limit;
+
 #[derive(ValueEnum, Clone)]
 pub enum LogLevel {
     Error,
@@ -31,8 +33,24 @@ impl From<LogLevel> for log::Level {
     }
 }
 
-pub fn init(log_level: LogLevel) {
-    let log_level: log::Level = log_level.into();
+pub fn welcome(addr: &str, limit: &limit::Limit) {
+    let addr_web = format!("http://{}/", addr);
+    let addr_ws = format!("http://{}/ws", addr);
+    let addrs = format!(
+        "\n\t{} directly on a browser\n\t{} to connect a websocket",
+        addr_web.blue(),
+        addr_ws.blue()
+    );
+
+    log::info!(
+        "Starting service: \"planning-poker\",\n\nlimit of sessions: {},\nlistening on:{}\n",
+        limit.max.to_string().blue(),
+        addrs
+    );
+}
+
+pub fn init(log_level: &LogLevel) {
+    let log_level: log::Level = log_level.clone().into();
 
     Builder::from_env(Env::default().default_filter_or(log_level.to_string()))
         .target(Target::Stdout)

@@ -152,7 +152,15 @@ body {
     transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
-.hand .card {
+.hand li .card.back, .hand li .card.back:hover {
+    transform: translateY(2em);
+}
+
+.hand:hover li .card.back {
+    transform: translateY(0);
+}
+
+.hand .card:not(.back) {
     animation: to-bottom 0.3s ease-out;
 }
 
@@ -261,4 +269,10 @@ p.loading {
 
 a {
     cursor: pointer;
+}
+
+.actions {
+    display: flex;
+    justify-content: right;
+    gap: 20px;
 }

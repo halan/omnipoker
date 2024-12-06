@@ -59,13 +59,15 @@ pub fn card(props: &Props) -> Html {
 
     let on_vote = props.on_vote.clone();
     let vote = props.vote.clone();
+    let back = props.back;
 
     let onclick = on_vote.map(|callback| {
         Callback::from(move |event: MouseEvent| {
             event.prevent_default();
-
-            if let Some(vote_value) = vote.as_deref() {
-                callback.emit(vote_value.to_string());
+            match (&vote, back) {
+                (Some(vote_value), _) => callback.emit(vote_value.to_string()),
+                (_, true) => callback.emit("".to_string()),
+                _ => {}
             }
         })
     });
@@ -73,26 +75,24 @@ pub fn card(props: &Props) -> Html {
     html! {
         <li>
             {
-                match props.on_vote {
-                    Some(_) => html! {
+                match (&props.on_vote, props.back) {
+                    (Some(_), true) => html! {
+                        <a class="card back" {onclick}>{ "*" }</a>
+                    },
+                    (Some(_), _) => html! {
                         <a class={classes!("card", rank_class, suit_class)} {onclick}>
                             <span class="rank">{ rank }</span>
                             <span class="suit">{ suit_symbol }</span>
                         </a>
                     },
-                    None => {
-                        if props.back {
-                            html! {
-                                <div class="card back">{ "*" }</div>
-                            }
-                        } else {
-                            html! {
-                                <div class={classes!("card", rank_class, suit_class, your_class)}>
-                                    <span class="rank">{ rank }</span>
-                                    <span class="suit">{ suit_symbol }</span>
-                                </div>
-                            }
-                        }
+                    (None, true) => html! {
+                        <div class="card back">{ "*" }</div>
+                    },
+                    (None, false) => html! {
+                        <div class={classes!("card", rank_class, suit_class, your_class)}>
+                            <span class="rank">{ rank }</span>
+                            <span class="suit">{ suit_symbol }</span>
+                        </div>
                     }
                 }
             }

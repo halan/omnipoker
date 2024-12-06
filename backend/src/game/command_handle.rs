@@ -1,4 +1,5 @@
 use super::game::{Command, ConnId, OutboundMessage, Vote};
+use shared::UserStatus;
 use tokio::sync::{
     mpsc,
     oneshot::{self, error::RecvError},
@@ -41,6 +42,12 @@ impl GameHandle {
                 vote: vote.clone(),
             })
             .expect("Failed to send Command::Vote");
+    }
+
+    pub async fn set_status(&self, conn_id: ConnId, status: UserStatus) {
+        self.cmd_tx
+            .send(Command::SetAway { conn_id, status })
+            .expect("Failed to send Command::SetAway");
     }
 }
 

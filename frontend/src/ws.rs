@@ -2,6 +2,7 @@ use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message, WebSocketError};
 use shared::{InboundMessage, OutboundMessage};
 use std::{cell::RefCell, rc::Rc};
+use wasm_bindgen_futures::spawn_local;
 pub type WebSocketSink = Rc<RefCell<SplitSink<WebSocket, Message>>>;
 
 pub fn connect_websocket(
@@ -11,7 +12,7 @@ pub fn connect_websocket(
     let ws = WebSocket::open("/ws?mode=json").ok()?;
     let (write, mut read) = ws.split();
 
-    wasm_bindgen_futures::spawn_local(async move {
+    spawn_local(async move {
         while let Some(msg) = read.next().await {
             match msg {
                 Ok(Message::Text(text)) => {

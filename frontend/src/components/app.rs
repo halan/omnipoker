@@ -16,6 +16,8 @@ pub fn app() -> Html {
         connect_callback,
         on_vote,
         on_remove_vote,
+        on_set_away,
+        on_away_back,
     } = use_planning_poker();
 
     html! {
@@ -42,7 +44,14 @@ pub fn app() -> Html {
                             {on_remove_vote}
                         />
                         <UserList user_list={state.user_list.clone()} nickname={state.nickname.clone()} />
-                        <Hand your_vote={state.your_vote.clone()} stage={state.stage.clone()} {on_vote} />
+                        <Hand
+                            your_vote={state.your_vote}
+                            your_status={state.your_status.clone()}
+                            stage={state.stage.clone()}
+                            {on_vote}
+                            {on_set_away}
+                            {on_away_back}
+                        />
                     </>
                 },
             }

@@ -1,4 +1,4 @@
-use shared::{Vote, VoteStatus};
+use shared::{UserStatus, Vote, VoteStatus};
 use std::rc::Rc;
 use yew::prelude::*;
 
@@ -38,6 +38,7 @@ pub enum StateAction {
     Connect(Option<String>),
     ConnectError(String),
     YourVote(Vote),
+    YourStatus(UserStatus),
     UpdateUserList(Vec<String>),
 }
 
@@ -52,6 +53,7 @@ pub struct State {
     pub nickname: Option<String>,
     pub error_box: Option<String>,
     pub your_vote: Vote,
+    pub your_status: UserStatus,
     pub is_rollback: bool,
     pub user_list: Vec<String>,
     pub screen: Screens,
@@ -64,6 +66,7 @@ impl Default for State {
             nickname: None,
             error_box: None,
             your_vote: Vote::Null,
+            your_status: UserStatus::Active,
             is_rollback: false,
             user_list: Vec::new(),
             screen: Screens::Home,
@@ -112,6 +115,10 @@ impl Reducible for State {
             },
             StateAction::YourVote(vote) => Self {
                 your_vote: vote,
+                ..(*self).clone()
+            },
+            StateAction::YourStatus(status) => Self {
+                your_status: status,
                 ..(*self).clone()
             },
             StateAction::UpdateUserList(list) => Self {

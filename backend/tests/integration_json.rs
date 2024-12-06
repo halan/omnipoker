@@ -247,7 +247,13 @@ async fn test_integration_planning_poker_json() {
 
     let captured_logs = server_guard.read_logs();
     let expected_logs = vec![
-        "Starting service",           // listening message
+        "Starting service", // welcome message
+        "",
+        "limit of sessions",
+        "listening on",
+        "directly on a browser",
+        "to connect a websocket",
+        "",
         "Game started",               // first message
         "User identified: Player1",   // Player1 identified
         "User identified: Player2",   // Player2 identified

@@ -1,6 +1,6 @@
 use super::command_handle::*;
 use shared::VoteStatus;
-pub use shared::{OutboundMessage, Vote};
+pub use shared::{OutboundMessage, UserStatus, Vote};
 use std::{cmp::Ordering, collections::HashMap, io};
 use tokio::sync::{mpsc, oneshot};
 
@@ -22,6 +22,7 @@ pub struct User {
     nickname: Nickname,
     tx: mpsc::UnboundedSender<OutboundMessage>,
     vote: Vote,
+    status: UserStatus,
     ord: usize,
 }
 
@@ -32,6 +33,29 @@ impl User {
 }
 
 type UsersMap = HashMap<ConnId, User>;
+
+fn validate_nickname(nickname: &str, users: UsersMap) -> Result<&str, String> {
+    let nickname = nickname.trim();
+
+    if nickname.is_empty() {
+        log::error!("Nickname cannot be empty: {}", nickname);
+        return Err("Nickname cannot be empty".into());
+    }
+
+    if users.values().any(|user| user.nickname == nickname) {
+        log::error!("Nickname already in use: {}", nickname);
+        return Err("Nickname already in use".into());
+    }
+
+    let nickname = if nickname.len() > 20 {
+        log::warn!("Nickname too long, truncating: {}", nickname);
+        &nickname[..20]
+    } else {
+        nickname
+    };
+
+    Ok(nickname)
+}
 
 #[derive(Debug)]
 pub struct GameServer {
@@ -60,31 +84,16 @@ impl GameServer {
         nickname: &str,
     ) -> Result<ConnId, String> {
         log::info!("User identified: {}", nickname);
-        let nickname = nickname.trim();
 
-        if nickname.is_empty() {
-            log::error!("Nickname cannot be empty: {}", nickname);
-            return Err("Nickname cannot be empty".into());
-        }
-
-        if self.users.values().any(|user| user.nickname == nickname) {
-            log::error!("Nickname already in use: {}", nickname);
-            return Err("Nickname already in use".into());
-        }
-
-        let nickname = if nickname.len() > 20usize {
-            log::warn!("Nickname too long, truncating: {}", nickname);
-            nickname[..20].to_string()
-        } else {
-            nickname.to_string()
-        };
+        let nickname = validate_nickname(nickname, self.users.clone())?;
 
         // register session with random connection ID
         let id = ConnId::new();
         let user = User {
-            nickname: nickname.clone(),
+            nickname: nickname.to_string(),
             tx,
             vote: Vote::Null,
+            status: UserStatus::Active,
             ord: 0,
         };
 
@@ -121,17 +130,31 @@ impl GameServer {
     }
 
     fn all_voted(&self) -> bool {
-        self.users.values().all(|user| user.vote.is_valid_vote())
+        self.users
+            .values()
+            .all(|user| user.vote.is_valid_vote() || matches!(user.status, UserStatus::Away))
     }
 
     fn anyone_voted(&self) -> bool {
-        self.users.values().any(|user| user.vote.is_valid_vote())
+        self.users
+            .values()
+            .any(|user| user.vote.is_valid_vote() && matches!(user.status, UserStatus::Active))
+    }
+
+    fn set_status(&mut self, id: ConnId, status: UserStatus) {
+        self.users
+            .get_mut(&id)
+            .map(|user| user.status = status.clone());
+
+        self.send_message(id, OutboundMessage::YourStatus(status));
+        self.broadcast(self.users_summary());
     }
 
     pub fn users_summary(&self) -> OutboundMessage {
         let mut users = self
             .users
             .values()
+            .filter(|user| matches!(user.status, UserStatus::Active))
             .map(|user| user.nickname.clone())
             .collect::<Vec<String>>();
 
@@ -152,6 +175,7 @@ impl GameServer {
         let mut statuses = self
             .users
             .values()
+            .filter(|user| matches!(user.status, UserStatus::Active))
             .map(|user| (user.nickname.clone(), user.vote.status(), user.ord))
             .collect::<Vec<(String, VoteStatus, usize)>>();
         statuses.sort_by(|(nick_a, status_a, ord_a), (nick_b, status_b, ord_b)| {
@@ -175,6 +199,7 @@ impl GameServer {
         let mut votes = self
             .users
             .values()
+            .filter(|user| matches!(user.status, UserStatus::Active))
             .map(|user| (user.nickname.clone(), user.vote.clone(), user.ord))
             .collect::<Vec<(String, Vote, usize)>>();
         votes.sort_by(|(_, _, ord_a), (_, _, ord_b)| ord_a.cmp(ord_b));
@@ -235,6 +260,9 @@ impl GameServer {
                     self.vote(conn_id, vote);
                 }
 
+                Command::SetAway { conn_id, status } => {
+                    self.set_status(conn_id, status);
+                }
                 #[cfg(test)]
                 Command::Shutdown => {
                     println!("Shutting down server.");
@@ -261,6 +289,11 @@ pub enum Command {
     Vote {
         conn_id: ConnId,
         vote: Vote,
+    },
+
+    SetAway {
+        conn_id: ConnId,
+        status: UserStatus,
     },
 
     #[cfg(test)]

@@ -13,12 +13,16 @@ pub struct UsePlanningPokerReturn {
     pub ws_sink: UseStateHandle<Option<WebSocketSink>>,
     pub on_nickname_change: Callback<InputEvent>,
     pub connect_callback: Callback<SubmitEvent>,
+    pub on_set_away: Callback<MouseEvent>,
+    pub on_away_back: Callback<String>,
     pub on_vote: Callback<String>,
     pub on_remove_vote: Callback<String>,
 }
 
 #[hook]
 pub fn use_planning_poker() -> UsePlanningPokerReturn {
+    use shared::UserStatus;
+
     let ws_sink = use_state(|| None);
     let state = use_reducer(State::default);
 
@@ -67,6 +71,11 @@ pub fn use_planning_poker() -> UsePlanningPokerReturn {
                             OutboundMessage::YourVote(vote) => {
                                 state.dispatch(StateAction::YourVote(vote));
                             }
+
+                            OutboundMessage::YourStatus(status) => {
+                                state.dispatch(StateAction::YourStatus(status));
+                            }
+
                             _ => {}
                         }
                     },
@@ -76,8 +85,16 @@ pub fn use_planning_poker() -> UsePlanningPokerReturn {
                         let ws_sink = ws_sink.clone();
                         move |err| {
                             ws_sink.set(None);
-                            if let WebSocketError::ConnectionClose(e) = err {
-                                state.dispatch(StateAction::ConnectError(e.reason));
+                            match err {
+                                WebSocketError::ConnectionClose(e) => {
+                                    state.dispatch(StateAction::ConnectError(e.reason));
+                                }
+                                WebSocketError::ConnectionError => {
+                                    state.dispatch(StateAction::ConnectError(
+                                        "The server is unreachable".to_string(),
+                                    ));
+                                }
+                                _ => {}
                             }
                         }
                     },
@@ -95,6 +112,35 @@ pub fn use_planning_poker() -> UsePlanningPokerReturn {
                         }
                     });
                 }
+            }
+        })
+    };
+
+    let on_set_away = {
+        let ws_sink = ws_sink.clone();
+
+        Callback::from(move |_| {
+            if let Some(sink) = &*ws_sink {
+                let sink = sink.clone();
+                spawn_local(async move {
+                    let message = InboundMessage::SetStatus(UserStatus::Away);
+                    send_message(&sink, &message).await;
+                });
+            }
+        })
+    };
+
+    let on_away_back = {
+        let ws_sink = ws_sink.clone();
+
+        Callback::from(move |_| {
+            log::debug!("on_away_back");
+            if let Some(sink) = &*ws_sink {
+                let sink = sink.clone();
+                spawn_local(async move {
+                    let message = InboundMessage::SetStatus(UserStatus::Active);
+                    send_message(&sink, &message).await;
+                });
             }
         })
     };
@@ -134,6 +180,8 @@ pub fn use_planning_poker() -> UsePlanningPokerReturn {
         ws_sink,
         on_nickname_change,
         connect_callback,
+        on_set_away,
+        on_away_back,
         on_vote,
         on_remove_vote,
     }

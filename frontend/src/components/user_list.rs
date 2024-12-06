@@ -9,10 +9,11 @@ pub struct Props {
 #[function_component(UserList)]
 pub fn user_list(props: &Props) -> Html {
     html! {
+    <>
         <div class="user-list">
             {
                 if props.user_list.is_empty() {
-                    html! { <p>{ "Loading..." }</p> }
+                    html! { <p>{ "There is nobody active." }</p> }
                 } else {
                     html! {
                         <ul>
@@ -30,5 +31,6 @@ pub fn user_list(props: &Props) -> Html {
                 }
             }
         </div>
+    </>
     }
 }

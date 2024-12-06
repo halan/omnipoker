@@ -50,9 +50,15 @@ async fn handle_text_message(
         return Ok(());
     }
 
-    if let InboundMessage::Vote { value: vote } = inbound {
-        if let Some(conn_id) = conn_id {
-            game_handler.vote(conn_id.clone(), vote).await;
+    // Commands after identifying
+
+    if let Some(conn_id) = conn_id {
+        match inbound {
+            InboundMessage::SetStatus(value) => {
+                game_handler.set_status(*conn_id, value.clone()).await
+            }
+            InboundMessage::Vote { value } => game_handler.vote(*conn_id, value).await,
+            _ => {}
         }
     }
 
