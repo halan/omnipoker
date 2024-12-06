@@ -47,7 +47,7 @@ pub fn init(log_level: LogLevel) {
                 log::Level::Trace => "TRACE".purple().bold(),
             };
 
-            let timestamp = format!("[{}]", Local::now().format("%Y-%m-%d %H:%M:%S")).black();
+            let timestamp = format!("[{}]", Local::now().format("%Y-%m-%d %H:%M:%S")).white();
             writeln!(buf, "{} {} {}", timestamp, level, record.args())
         })
         .init();

@@ -15,7 +15,7 @@ const VOTES: [&str; 7] = ["?", "1", "2", "3", "5", "8", "13"];
 #[function_component(Hand)]
 pub fn hand(props: &Props) -> Html {
     html! {
-        <div class="playingCards fourColours rotateHand">
+        <div class="playingCards twoColours faceImages rotateHand">
             <ul class="hand">
                 { for VOTES.iter()
                     .map(|vote| {

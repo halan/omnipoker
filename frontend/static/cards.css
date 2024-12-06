@@ -173,12 +173,6 @@
     position: absolute;
 }
 
-.playingCards .card.joker .rank:before {
-    content: "\2605";
-    top: 0;
-    left: 0;
-}
-
 .playingCards .card.joker .suit {
     text-indent: -9999px;
 }
@@ -385,7 +379,8 @@
 .playingCards.faceImages .card.rank-k,
 .playingCards.faceImages .card.joker {
     background-repeat: no-repeat;
-    background-position: -1em 0;
+    background-position: .8em;
+    background-size: 70%;
     /* @change: smaller cards: more negative distance from the left
        bigger cards: 0 or more positive distance from the left */
 
@@ -397,6 +392,11 @@
     -khtml-background-size: contain;
     background-size: contain;
     */
+}
+
+body .playingCards.faceImages .card.joker {
+    background-position: 0;
+    background-size: 100%;
 }
 
 .playingCards.faceImages .card.rank-j.diams {

@@ -21,7 +21,7 @@ pub fn poker_stage(props: &Props) -> Html {
                     Stage::Init => html! { <p>{"Pick a card when you're ready to vote"}</p> },
                     Stage::Result(result) => html! {
                         <div>
-                            <div class="playingCards fourColours">
+                            <div class="playingCards faceImages twoColours">
                                 <ul class="table result">
                                 { for result.iter()
                                     .map(|(nickname, result)| html! {
@@ -39,7 +39,7 @@ pub fn poker_stage(props: &Props) -> Html {
 
                         html! {
                             <div>
-                                <div class="playingCards fourColours">
+                                <div class="playingCards faceImages twoColours">
                                     <ul class={classes!("table", "status", if props.is_rollback { "rollback" } else { "" })}>
                                         { for statuses_iter
                                             .map(|(user, _)| {

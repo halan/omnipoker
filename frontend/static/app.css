@@ -236,7 +236,7 @@ body {
 
 p.loading {
     text-align: center;
-    font-size: 1.5rem;
+    font-size: .8rem;
     color: #555;
     animation: pulse 1s infinite;
 }

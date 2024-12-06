@@ -16,7 +16,7 @@ pub struct Props {
 
 fn vote_to_rank(vote: &str) -> &str {
     match vote {
-        "?" => "-",
+        "?" => "",
         "1" => "A",
         "2" => "2",
         "3" => "3",
