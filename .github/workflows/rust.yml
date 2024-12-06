@@ -16,11 +16,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
     - name: Install Trunk
       run: cargo install --locked trunk
     - name: Build Frontend
       run: cd frontend; trunk build --verbose; cd ..
+    - name: Build
+      run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
