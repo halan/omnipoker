@@ -25,3 +25,6 @@ Once everyone has voted, all votes will be revealed. The server will not dictate
 ### Browser mode
 
 By the fault, the server will serve an UI by the :8080.
+
+https://github.com/user-attachments/assets/beb7abc2-05ac-4eec-90f0-dc41a808c525
+
