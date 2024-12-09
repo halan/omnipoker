@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 pub type Nickname = String;
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct ConnId(Uuid);
 
 impl ConnId {
@@ -34,7 +34,7 @@ impl User {
 
 type UsersMap = HashMap<ConnId, User>;
 
-fn validate_nickname(nickname: &str, users: UsersMap) -> Result<&str, String> {
+fn validate_nickname<'a>(nickname: &'a str, users: &UsersMap) -> Result<&'a str, String> {
     let nickname = nickname.trim();
 
     if nickname.is_empty() {
@@ -85,10 +85,9 @@ impl GameServer {
     ) -> Result<ConnId, String> {
         log::info!("User identified: {}", nickname);
 
-        let nickname = validate_nickname(nickname, self.users.clone())?;
+        let nickname = validate_nickname(nickname, &self.users)?;
 
         // register session with random connection ID
-        let id = ConnId::new();
         let user = User {
             nickname: nickname.to_string(),
             tx,
@@ -97,32 +96,34 @@ impl GameServer {
             ord: 0,
         };
 
-        self.users.insert(id, user);
-        self.broadcast(self.users_summary());
+        let conn_id = ConnId::new();
+
+        self.users.insert(conn_id.clone(), user);
+        self.broadcast(&self.users_summary());
         if self.anyone_voted() {
-            self.broadcast(self.votes_summary());
+            self.broadcast(&self.votes_summary());
         }
 
-        Ok(id)
+        Ok(conn_id)
     }
 
-    pub fn disconnect(&mut self, id: ConnId) {
+    pub fn disconnect(&mut self, id: &ConnId) {
         log::info!(
             "User disconnected: {}",
             self.users.get(&id).map_or("<None>", |user| &user.nickname)
         );
         self.users.remove(&id);
-        self.broadcast(self.users_summary());
+        self.broadcast(&self.users_summary());
     }
 
-    pub fn vote(&mut self, id: ConnId, vote: Vote) {
+    pub fn vote(&mut self, id: &ConnId, vote: &Vote) {
         let max_ord = self.users.values().map(|user| user.ord).max().unwrap_or(0);
         self.users.get_mut(&id).map(|user| {
             user.vote(vote.clone());
             user.ord = max_ord + 1;
         });
-        self.send_message(id, OutboundMessage::YourVote(vote.into()));
-        self.broadcast(self.votes_summary());
+        self.send_message(id, OutboundMessage::YourVote(vote.clone()));
+        self.broadcast(&self.votes_summary());
 
         if self.all_voted() {
             self.reset_votes();
@@ -141,13 +142,13 @@ impl GameServer {
             .any(|user| user.vote.is_valid_vote() && matches!(user.status, UserStatus::Active))
     }
 
-    fn set_status(&mut self, id: ConnId, status: UserStatus) {
+    fn set_status(&mut self, id: &ConnId, status: &UserStatus) {
         self.users
             .get_mut(&id)
             .map(|user| user.status = status.clone());
 
-        self.send_message(id, OutboundMessage::YourStatus(status));
-        self.broadcast(self.users_summary());
+        self.send_message(id, OutboundMessage::YourStatus(status.clone()));
+        self.broadcast(&self.users_summary());
     }
 
     pub fn users_summary(&self) -> OutboundMessage {
@@ -222,21 +223,21 @@ impl GameServer {
     fn send_to(
         &self,
         targets: Vec<&mpsc::UnboundedSender<OutboundMessage>>,
-        message: OutboundMessage,
+        message: &OutboundMessage,
     ) {
         for target in targets {
             let _ = target.send(message.clone());
         }
     }
 
-    pub fn broadcast(&self, message: OutboundMessage) {
+    pub fn broadcast(&self, message: &OutboundMessage) {
         let targets: Vec<_> = self.users.values().map(|user| &user.tx).collect();
-        self.send_to(targets, message);
+        self.send_to(targets, &message);
     }
 
-    pub fn send_message(&self, id: ConnId, message: OutboundMessage) {
+    pub fn send_message(&self, id: &ConnId, message: OutboundMessage) {
         if let Some(user) = self.users.get(&id) {
-            self.send_to(vec![&user.tx], message);
+            self.send_to(vec![&user.tx], &message);
         }
     }
 
@@ -253,15 +254,15 @@ impl GameServer {
                 }
 
                 Command::Disconnect { conn_id } => {
-                    self.disconnect(conn_id);
+                    self.disconnect(&conn_id);
                 }
 
                 Command::Vote { conn_id, vote } => {
-                    self.vote(conn_id, vote);
+                    self.vote(&conn_id, &vote);
                 }
 
                 Command::SetAway { conn_id, status } => {
-                    self.set_status(conn_id, status);
+                    self.set_status(&conn_id, &status);
                 }
                 #[cfg(test)]
                 Command::Shutdown => {
@@ -399,7 +400,7 @@ mod tests {
         handle
             .cmd_tx
             .send(Command::Vote {
-                conn_id: *conn_id.as_ref().unwrap(),
+                conn_id: conn_id.clone().unwrap(),
                 vote: vote.clone(),
             })
             .unwrap();

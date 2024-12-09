@@ -29,24 +29,29 @@ impl GameHandle {
         res_rx.await
     }
 
-    pub fn disconnect(&self, conn_id: ConnId) {
+    pub fn disconnect(&self, conn_id: &ConnId) {
         self.cmd_tx
-            .send(Command::Disconnect { conn_id })
+            .send(Command::Disconnect {
+                conn_id: conn_id.clone(),
+            })
             .expect("Failed to send Command::Disconnect");
     }
 
-    pub async fn vote(&self, conn_id: ConnId, vote: &Vote) {
+    pub async fn vote(&self, conn_id: &ConnId, vote: &Vote) {
         self.cmd_tx
             .send(Command::Vote {
-                conn_id,
+                conn_id: conn_id.clone(),
                 vote: vote.clone(),
             })
             .expect("Failed to send Command::Vote");
     }
 
-    pub async fn set_status(&self, conn_id: ConnId, status: UserStatus) {
+    pub async fn set_status(&self, conn_id: &ConnId, status: &UserStatus) {
         self.cmd_tx
-            .send(Command::SetAway { conn_id, status })
+            .send(Command::SetAway {
+                conn_id: conn_id.clone(),
+                status: status.clone(),
+            })
             .expect("Failed to send Command::SetAway");
     }
 }
@@ -65,10 +70,11 @@ mod tests {
         let nickname = "Player1".to_string();
         let conn_tx = mpsc::unbounded_channel().0;
 
-        let expected_connd_id = ConnId::new();
+        let expected_conn_id = ConnId::new();
 
         tokio::spawn({
             let nickname = nickname.clone();
+            let expected_conn_id = expected_conn_id.clone();
             async move {
                 if let Some(Command::Connect {
                     conn_tx: _,
@@ -77,7 +83,7 @@ mod tests {
                 }) = cmd_rx.recv().await
                 {
                     assert_eq!(n, nickname);
-                    r.send(Ok(expected_connd_id)).unwrap();
+                    r.send(Ok(expected_conn_id)).unwrap();
                 }
             }
         });
@@ -87,7 +93,7 @@ mod tests {
             .await
             .expect("Failed to receive ConnId");
 
-        assert_eq!(conn_id, Ok(expected_connd_id));
+        assert_eq!(conn_id, Ok(expected_conn_id));
     }
 
     #[tokio::test]
@@ -98,13 +104,16 @@ mod tests {
         let conn_id = ConnId::new();
         let vote_value = Vote::new(2);
 
-        tokio::spawn(async move {
-            if let Some(Command::Vote { conn_id: id, vote }) = cmd_rx.recv().await {
-                assert_eq!(id, conn_id);
-                assert_eq!(vote, Vote::Option(2));
+        tokio::spawn({
+            let conn_id = conn_id.clone();
+            async move {
+                if let Some(Command::Vote { conn_id: id, vote }) = cmd_rx.recv().await {
+                    assert_eq!(id, conn_id);
+                    assert_eq!(vote, Vote::Option(2));
+                }
             }
         });
 
-        game_handle.vote(conn_id, &vote_value).await;
+        game_handle.vote(&conn_id, &vote_value).await;
     }
 }

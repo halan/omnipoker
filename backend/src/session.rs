@@ -54,10 +54,8 @@ async fn handle_text_message(
 
     if let Some(conn_id) = conn_id {
         match inbound {
-            InboundMessage::SetStatus(value) => {
-                game_handler.set_status(*conn_id, value.clone()).await
-            }
-            InboundMessage::Vote { value } => game_handler.vote(*conn_id, value).await,
+            InboundMessage::SetStatus(value) => game_handler.set_status(conn_id, value).await,
+            InboundMessage::Vote { value } => game_handler.vote(conn_id, value).await,
             _ => {}
         }
     }
@@ -191,7 +189,7 @@ pub async fn init(
     };
 
     if let Some(conn_id) = conn_id {
-        game_handler.disconnect(conn_id);
+        game_handler.disconnect(&conn_id);
     }
 
     let _ = session.close(close_reason).await;
