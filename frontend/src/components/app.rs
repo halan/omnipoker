@@ -43,11 +43,11 @@ pub fn app() -> Html {
                             nickname={state.nickname.clone()}
                             {on_remove_vote}
                         />
-                        <UserList user_list={state.user_list.clone()} nickname={state.nickname.clone()} />
+                        <UserList user_list={state.user_list} nickname={state.nickname} />
                         <Hand
                             your_vote={state.your_vote}
-                            your_status={state.your_status.clone()}
-                            stage={state.stage.clone()}
+                            your_status={state.your_status}
+                            stage={state.stage}
                             {on_vote}
                             {on_set_away}
                             {on_away_back}

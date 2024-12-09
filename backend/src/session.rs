@@ -26,10 +26,8 @@ async fn handle_text_message(
             nickname: new_nickname,
         } = inbound
         {
-            *nickname = Some(new_nickname.clone());
-            let result = game_handler
-                .connect(conn_tx.clone(), new_nickname.as_str())
-                .await;
+            let result = game_handler.connect(conn_tx.clone(), new_nickname).await;
+            *nickname = Some(new_nickname.to_string());
 
             match result {
                 Ok(Ok(new_conn_id)) => {
