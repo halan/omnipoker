@@ -34,7 +34,7 @@ impl ServerGuard {
         }
 
         let command = "cargo";
-        let addr = format!("0.0.0.0:{}", port);
+        let addr = format!("127.0.0.1:{}", port);
         let args = vec!["run", "--", addr.as_str()];
         let command_string = format!("{} {}", command, args.join(" "));
 

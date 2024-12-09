@@ -5,10 +5,10 @@ use tokio_tungstenite::{connect_async, tungstenite::Error, MaybeTlsStream, WebSo
 mod helpers;
 
 #[tokio::test]
-async fn test_integration_planning_poker() {
+async fn planning_poker() {
     let port = "8081";
     let server_url = format!("ws://127.0.0.1:{}/ws", port);
-    let waiting_time = Duration::from_secs(10);
+    let waiting_time = Duration::from_secs(30);
     let mut server_guard = ServerGuard::new();
 
     server_guard.start(port, waiting_time).await;

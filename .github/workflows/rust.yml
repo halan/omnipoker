@@ -2,27 +2,27 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Add target WASM32
-      run : rustup target add wasm32-unknown-unknown
-    - name: Install Trunk
-      run: cargo install --locked trunk
-    - name: Build Frontend
-      run: cd frontend; trunk build --verbose; cd ..
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose --skip test_integration_planning_poker_json --skip test_integration_planning_poker_text
+      - uses: actions/checkout@v4
+      - name: Add target WASM32
+        run: rustup target add wasm32-unknown-unknown
+      - name: Install Trunk
+        run: cargo install --locked trunk
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: trunk build --verbose
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
