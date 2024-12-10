@@ -1,17 +1,20 @@
-use helpers::{expect_message, send_message, ServerGuard};
-use tokio::{net::TcpStream, time::Duration};
+use helpers::{expect_message, get_port, send_message, ServerGuard};
+use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, tungstenite::Error, MaybeTlsStream, WebSocketStream};
 
 mod helpers;
 
+fn get_server_url() -> (String, String) {
+    let port = &get_port();
+    (port.to_owned(), format!("ws://127.0.0.1:{}/ws", port))
+}
+
 #[tokio::test]
 async fn planning_poker() {
-    let port = "8081";
-    let server_url = format!("ws://127.0.0.1:{}/ws", port);
-    let waiting_time = Duration::from_secs(30);
+    let (port, server_url) = get_server_url();
     let mut server_guard = ServerGuard::new();
 
-    server_guard.start(port, waiting_time).await;
+    server_guard.start(&port).await;
 
     let (mut ws_stream_1, _) = connect_async(server_url.as_str())
         .await
@@ -22,32 +25,20 @@ async fn planning_poker() {
         .expect("Failed to connect to WebSocket");
 
     send_message(&mut ws_stream_1, "/join Player1").await;
-    expect_message(
-        |text| assert_eq!(text, "Users: Player1"),
-        &mut ws_stream_1,
-        waiting_time,
-    )
-    .await;
+    expect_message(|text| assert_eq!(text, "Users: Player1"), &mut ws_stream_1).await;
 
     send_message(&mut ws_stream_2, "/join Player2").await;
     expect_message(
         |text| assert_eq!(text, "Users: Player1, Player2"),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
     send_message(&mut ws_stream_1, "1").await;
-    expect_message(
-        |text| assert_eq!(text, "You voted: 1"),
-        &mut ws_stream_1,
-        waiting_time,
-    )
-    .await;
+    expect_message(|text| assert_eq!(text, "You voted: 1"), &mut ws_stream_1).await;
     expect_message(
         |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -55,7 +46,6 @@ async fn planning_poker() {
     expect_message(
         |text| assert_eq!(text, "Votes: Player1: 1, Player2: 2"),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -63,27 +53,19 @@ async fn planning_poker() {
     expect_message(
         |text| assert_eq!(text, "You voted: not voted"),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
     expect_message(
         |text| assert_eq!(text, "Votes: Player1: not voted, Player2: not voted"),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
     send_message(&mut ws_stream_1, "?").await;
-    expect_message(
-        |text| assert_eq!(text, "You voted: ?"),
-        &mut ws_stream_1,
-        waiting_time,
-    )
-    .await;
+    expect_message(|text| assert_eq!(text, "You voted: ?"), &mut ws_stream_1).await;
     expect_message(
         |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -95,45 +77,30 @@ async fn planning_poker() {
     expect_message(
         |text| assert_eq!(text, "Users: Player1, Player2"),
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
     expect_message(
         |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
-    expect_message(
-        |text| assert_eq!(text, "You voted: 2"),
-        &mut ws_stream_2,
-        waiting_time,
-    )
-    .await;
+    expect_message(|text| assert_eq!(text, "You voted: 2"), &mut ws_stream_2).await;
     expect_message(
         |text| assert_eq!(text, "Votes: Player1: 1, Player2: 2"),
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
     expect_message(
         |text| assert_eq!(text, "Votes: Player1: not voted, Player2: not voted"),
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
     expect_message(
         |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
-    expect_message(
-        |text| assert_eq!(text, "Users: Player2"),
-        &mut ws_stream_2,
-        waiting_time,
-    )
-    .await;
+    expect_message(|text| assert_eq!(text, "Users: Player2"), &mut ws_stream_2).await;
 
     ws_stream_2
         .close(None)
@@ -168,19 +135,78 @@ async fn planning_poker() {
 }
 
 #[tokio::test]
-async fn test_server_limit() {
-    let port = "8083";
+async fn test_away() {
+    let port = &get_port();
     let server_url = format!("ws://127.0.0.1:{}/ws", port);
-    let waiting_time = Duration::from_secs(10);
     let mut server_guard = ServerGuard::new();
 
-    server_guard.start(port, waiting_time).await;
+    server_guard.start(port).await;
+
+    let (mut ws_stream_1, _) = connect_async(server_url.as_str())
+        .await
+        .expect("Failed to connect to WebSocket");
+
+    let (mut ws_stream_2, _) = connect_async(server_url.as_str())
+        .await
+        .expect("Failed to connect to WebSocket");
+
+    send_message(&mut ws_stream_1, "/join Player1").await;
+    expect_message(|text| assert_eq!(text, "Users: Player1"), &mut ws_stream_1).await;
+
+    send_message(&mut ws_stream_2, "/join Player2").await;
+    expect_message(
+        |text| assert_eq!(text, "Users: Player1, Player2"),
+        &mut ws_stream_1,
+    )
+    .await;
+
+    send_message(&mut ws_stream_1, "/setaway").await;
+    expect_message(|text| assert_eq!(text, "You are away"), &mut ws_stream_1).await;
+    expect_message(|text| assert_eq!(text, "Users: Player2"), &mut ws_stream_1).await;
+
+    send_message(&mut ws_stream_2, "2").await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player2: 2"),
+        &mut ws_stream_1,
+    )
+    .await;
+
+    send_message(&mut ws_stream_1, "/setback").await;
+    expect_message(|text| assert_eq!(text, "You are active"), &mut ws_stream_1).await;
+    expect_message(
+        |text| assert_eq!(text, "Users: Player1, Player2"),
+        &mut ws_stream_1,
+    )
+    .await;
+
+    send_message(&mut ws_stream_1, "1").await;
+    expect_message(|text| assert_eq!(text, "You voted: 1"), &mut ws_stream_1).await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: voted, Player2: not voted"),
+        &mut ws_stream_1,
+    )
+    .await;
+
+    send_message(&mut ws_stream_2, "1").await;
+    expect_message(
+        |text| assert_eq!(text, "Votes: Player1: 1, Player2: 1"),
+        &mut ws_stream_1,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn test_server_limit() {
+    let (port, server_url) = get_server_url();
+    let mut server_guard = ServerGuard::new();
+
+    server_guard.start(&port).await;
 
     const SERVER_LIMIT: usize = 15;
 
     let mut connections: [Option<WebSocketStream<MaybeTlsStream<TcpStream>>>; SERVER_LIMIT - 1] =
         Default::default();
-    for i in 0..(SERVER_LIMIT - 1) {
+    for i in 0..SERVER_LIMIT - 1 {
         let (ws_stream, _) = connect_async(server_url.as_str())
             .await
             .expect("Failed to connect to WebSocket");

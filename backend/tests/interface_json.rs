@@ -1,18 +1,23 @@
-use helpers::{expect_message, send_message, ServerGuard};
+use helpers::{expect_message, get_port, send_message, ServerGuard};
 use serde_json::json;
-use tokio::time::Duration;
 use tokio_tungstenite::connect_async;
 
 mod helpers;
 
+fn get_server_url() -> (String, String) {
+    let port = &get_port();
+    (
+        port.to_owned(),
+        format!("ws://127.0.0.1:{}/ws?mode=json", port),
+    )
+}
+
 #[tokio::test]
 async fn planning_poker_json() {
-    let port = "8082";
-    let server_url = format!("ws://127.0.0.1:{}/ws?mode=json", port);
-    let waiting_time = Duration::from_secs(30);
+    let (port, server_url) = get_server_url();
     let mut server_guard = ServerGuard::new();
 
-    server_guard.start(port, waiting_time).await;
+    server_guard.start(&port).await;
 
     let (mut ws_stream_1, _) = connect_async(server_url.as_str())
         .await
@@ -31,7 +36,6 @@ async fn planning_poker_json() {
     expect_message(
         |text| assert_eq!(&text, &json!({"user_list": ["Player1"]}).to_string(),),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -49,7 +53,6 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -62,7 +65,6 @@ async fn planning_poker_json() {
     expect_message(
         |text| assert_eq!(&text, &json!({"your_vote": "1"}).to_string()),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -78,7 +80,6 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -96,7 +97,6 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -109,7 +109,6 @@ async fn planning_poker_json() {
     expect_message(
         |text| assert_eq!(&text, &json!({"your_vote": "not voted"}).to_string()),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -125,7 +124,6 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -138,7 +136,6 @@ async fn planning_poker_json() {
     expect_message(
         |text| assert_eq!(&text, &json!({"your_vote": "?"}).to_string()),
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -154,7 +151,6 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_1,
-        waiting_time,
     )
     .await;
 
@@ -171,7 +167,6 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
 
@@ -184,14 +179,12 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
 
     expect_message(
         |text| assert_eq!(&text, &json!({"your_vote": "2"}).to_string()),
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
 
@@ -203,7 +196,6 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
 
@@ -216,7 +208,6 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
 
@@ -229,14 +220,12 @@ async fn planning_poker_json() {
             )
         },
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
 
     expect_message(
         |text| assert_eq!(&text, &json!({"user_list": ["Player2"]}).to_string()),
         &mut ws_stream_2,
-        waiting_time,
     )
     .await;
 

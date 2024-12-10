@@ -15,6 +15,15 @@ use tokio_tungstenite::{
 
 pub type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
+static PORT: Mutex<u16> = Mutex::new(9000);
+const TIMEOUT: Duration = Duration::from_secs(1);
+
+pub fn get_port() -> String {
+    let mut port = PORT.lock().unwrap();
+    *port += 1;
+    format!("{}", *port)
+}
+
 pub struct ServerGuard {
     pub process: Option<Child>,
     logs: Arc<Mutex<Vec<String>>>,
@@ -28,7 +37,7 @@ impl ServerGuard {
         }
     }
 
-    pub async fn start(&mut self, port: &str, timeout_duration: Duration) {
+    pub async fn start(&mut self, port: &str) {
         if self.process.is_some() {
             panic!("Server is already running!");
         }
@@ -52,17 +61,17 @@ impl ServerGuard {
         self.start_capture_logs();
 
         let start_time = tokio::time::Instant::now();
-        let max_duration = timeout_duration;
+        let max_duration = &TIMEOUT;
 
         loop {
             let elapsed = start_time.elapsed();
-            if elapsed >= max_duration {
+            if elapsed >= *max_duration {
                 let logs = self.read_logs();
                 println!("Captured logs before timeout: {:?}", logs);
 
                 panic!(
                     "Timed out waiting for server to start after {} seconds",
-                    timeout_duration.as_secs()
+                    &TIMEOUT.as_secs()
                 );
             }
 
@@ -70,7 +79,7 @@ impl ServerGuard {
             tokio::time::sleep(Duration::from_millis(500)).await;
 
             match timeout(
-                timeout_duration,
+                TIMEOUT,
                 connect_async(format!("ws://127.0.0.1:{}/ws", port)),
             )
             .await
@@ -142,13 +151,9 @@ pub async fn send_message(ws_stream: &mut WsStream, message: &str) {
         .expect("Failed to send message");
 }
 
-pub async fn expect_message(
-    receive_message: impl Fn(&str),
-    ws_stream: &mut WsStream,
-    timeout_duration: Duration,
-) {
+pub async fn expect_message(receive_message: impl Fn(&str), ws_stream: &mut WsStream) {
     loop {
-        match timeout(timeout_duration, ws_stream.next())
+        match timeout(TIMEOUT, ws_stream.next())
             .await
             .expect("Timed out waiting for message")
             .expect("Failed to read message")
