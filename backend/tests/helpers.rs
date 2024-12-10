@@ -16,7 +16,7 @@ use tokio_tungstenite::{
 pub type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 static PORT: Mutex<u16> = Mutex::new(9000);
-const TIMEOUT: Duration = Duration::from_secs(5);
+const TIMEOUT: Duration = Duration::from_secs(10);
 
 pub fn get_port() -> String {
     let mut port = PORT.lock().unwrap();
