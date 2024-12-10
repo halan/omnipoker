@@ -27,6 +27,7 @@ pub fn get_port() -> String {
 pub struct ServerGuard {
     pub process: Option<Child>,
     logs: Arc<Mutex<Vec<String>>>,
+    errs: Arc<Mutex<Vec<String>>>,
 }
 
 impl ServerGuard {
@@ -34,6 +35,7 @@ impl ServerGuard {
         Self {
             process: None,
             logs: Arc::new(Mutex::new(Vec::new())),
+            errs: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -66,8 +68,15 @@ impl ServerGuard {
         loop {
             let elapsed = start_time.elapsed();
             if elapsed >= *max_duration {
-                let logs = self.read_logs();
-                println!("Captured logs before timeout: {:?}", logs);
+                println!(
+                    "Captured errors before timeout: {}",
+                    self.errs
+                        .lock()
+                        .unwrap()
+                        .drain(..)
+                        .collect::<Vec<_>>()
+                        .join("\n\t")
+                );
 
                 panic!(
                     "Timed out waiting for server to start after {} seconds",
@@ -104,8 +113,8 @@ impl ServerGuard {
             .as_mut()
             .expect("Server process is not running");
 
-        let stdout = process.stdout.take().expect("Failed to capture stdout");
         let logs = Arc::clone(&self.logs);
+        let stdout = process.stdout.take().expect("Failed to capture stdout");
 
         // Spawn a thread to capture stdout logs
         thread::spawn(move || {
@@ -114,6 +123,20 @@ impl ServerGuard {
                 if let Ok(line) = line {
                     let mut logs = logs.lock().unwrap();
                     logs.push(line);
+                }
+            }
+        });
+
+        let errs = Arc::clone(&self.errs);
+        let stderr = process.stderr.take().expect("Failed to capture stderr");
+
+        // Spawn a thread to capture stderr logs
+        thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    let mut errs = errs.lock().unwrap();
+                    errs.push(line);
                 }
             }
         });
