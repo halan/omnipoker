@@ -16,7 +16,8 @@ use tokio_tungstenite::{
 pub type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 static PORT: Mutex<u16> = Mutex::new(8080);
-const TIMEOUT: Duration = Duration::from_secs(10);
+// That timeout should considering the compiling time on CI
+const TIMEOUT: Duration = Duration::from_secs(30);
 
 pub fn get_port() -> String {
     let mut port = PORT.lock().unwrap();
