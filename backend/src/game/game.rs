@@ -1,7 +1,8 @@
 use super::command_handle::*;
+use crate::error::{Error, Result};
 use shared::VoteStatus;
 pub use shared::{OutboundMessage, UserStatus, Vote};
-use std::{cmp::Ordering, collections::HashMap, io};
+use std::{cmp::Ordering, collections::HashMap};
 use tokio::sync::{mpsc, oneshot};
 
 use uuid::Uuid;
@@ -14,6 +15,12 @@ pub struct ConnId(Uuid);
 impl ConnId {
     pub fn new() -> Self {
         ConnId(Uuid::new_v4())
+    }
+}
+
+impl std::fmt::Display for ConnId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -34,17 +41,17 @@ impl User {
 
 type UsersMap = HashMap<ConnId, User>;
 
-fn validate_nickname<'a>(nickname: &'a str, users: &UsersMap) -> Result<&'a str, String> {
+fn validate_nickname<'a>(nickname: &'a str, users: &UsersMap) -> Result<&'a str> {
     let nickname = nickname.trim();
 
     if nickname.is_empty() {
         log::error!("Nickname cannot be empty: {}", nickname);
-        return Err("Nickname cannot be empty".into());
+        return Err(Error::NicknameCannotBeEmpty);
     }
 
     if users.values().any(|user| user.nickname == nickname) {
         log::error!("Nickname already in use: {}", nickname);
-        return Err("Nickname already in use".into());
+        return Err(Error::NicknameAlreadyInUse(nickname.into()));
     }
 
     let nickname = if nickname.len() > 20 {
@@ -82,7 +89,7 @@ impl GameServer {
         &mut self,
         tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
-    ) -> Result<ConnId, String> {
+    ) -> Result<ConnId> {
         log::info!("User identified: {}", nickname);
 
         let nickname = validate_nickname(nickname, &self.users)?;
@@ -99,35 +106,39 @@ impl GameServer {
         let conn_id = ConnId::new();
 
         self.users.insert(conn_id.clone(), user);
-        self.broadcast(&self.users_summary());
+        self.broadcast(&self.users_summary())?;
         if self.anyone_voted() {
-            self.broadcast(&self.votes_summary());
+            self.broadcast(&self.votes_summary())?;
         }
 
         Ok(conn_id)
     }
 
-    pub fn disconnect(&mut self, id: &ConnId) {
+    pub fn disconnect(&mut self, id: &ConnId) -> Result<()> {
         log::info!(
             "User disconnected: {}",
             self.users.get(&id).map_or("<None>", |user| &user.nickname)
         );
         self.users.remove(&id);
-        self.broadcast(&self.users_summary());
+        self.broadcast(&self.users_summary())?;
+
+        Ok(())
     }
 
-    pub fn vote(&mut self, id: &ConnId, vote: &Vote) {
+    pub fn vote(&mut self, id: &ConnId, vote: &Vote) -> Result<()> {
         let max_ord = self.users.values().map(|user| user.ord).max().unwrap_or(0);
         self.users.get_mut(&id).map(|user| {
             user.vote(vote.clone());
             user.ord = max_ord + 1;
         });
-        self.send_message(id, OutboundMessage::YourVote(vote.clone()));
-        self.broadcast(&self.votes_summary());
+        self.send_message(id, OutboundMessage::YourVote(vote.clone()))?;
+        self.broadcast(&self.votes_summary())?;
 
         if self.all_voted() {
             self.reset_votes();
         }
+
+        Ok(())
     }
 
     fn all_voted(&self) -> bool {
@@ -142,13 +153,15 @@ impl GameServer {
             .any(|user| user.vote.is_valid_vote() && matches!(user.status, UserStatus::Active))
     }
 
-    fn set_status(&mut self, id: &ConnId, status: &UserStatus) {
+    fn set_status(&mut self, id: &ConnId, status: &UserStatus) -> Result<()> {
         self.users
             .get_mut(&id)
             .map(|user| user.status = status.clone());
 
-        self.send_message(id, OutboundMessage::YourStatus(status.clone()));
-        self.broadcast(&self.users_summary());
+        self.send_message(id, OutboundMessage::YourStatus(status.clone()))?;
+        self.broadcast(&self.users_summary())?;
+
+        Ok(())
     }
 
     pub fn users_summary(&self) -> OutboundMessage {
@@ -224,24 +237,29 @@ impl GameServer {
         &self,
         targets: Vec<&mpsc::UnboundedSender<OutboundMessage>>,
         message: &OutboundMessage,
-    ) {
+    ) -> Result<()> {
         for target in targets {
-            let _ = target.send(message.clone());
+            target.send(message.clone())?;
         }
+
+        Ok(())
     }
 
-    pub fn broadcast(&self, message: &OutboundMessage) {
+    pub fn broadcast(&self, message: &OutboundMessage) -> Result<()> {
         let targets: Vec<_> = self.users.values().map(|user| &user.tx).collect();
-        self.send_to(targets, &message);
+        self.send_to(targets, &message)?;
+
+        Ok(())
     }
 
-    pub fn send_message(&self, id: &ConnId, message: OutboundMessage) {
-        if let Some(user) = self.users.get(&id) {
-            self.send_to(vec![&user.tx], &message);
-        }
+    pub fn send_message(&self, id: &ConnId, message: OutboundMessage) -> Result<()> {
+        let user = self.users.get(&id).ok_or(Error::UserNotFound(id.clone()))?;
+        self.send_to(vec![&user.tx], &message)?;
+
+        Ok(())
     }
 
-    pub async fn run(&mut self) -> io::Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
         while let Some(cmd) = self.cmd_rx.recv().await {
             match cmd {
                 Command::Connect {
@@ -254,15 +272,15 @@ impl GameServer {
                 }
 
                 Command::Disconnect { conn_id } => {
-                    self.disconnect(&conn_id);
+                    self.disconnect(&conn_id)?;
                 }
 
                 Command::Vote { conn_id, vote } => {
-                    self.vote(&conn_id, &vote);
+                    self.vote(&conn_id, &vote)?;
                 }
 
                 Command::SetAway { conn_id, status } => {
-                    self.set_status(&conn_id, &status);
+                    self.set_status(&conn_id, &status)?;
                 }
                 #[cfg(test)]
                 Command::Shutdown => {
@@ -276,11 +294,12 @@ impl GameServer {
     }
 }
 
+#[derive(Debug)]
 pub enum Command {
     Connect {
         conn_tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: String,
-        res_tx: oneshot::Sender<Result<ConnId, String>>,
+        res_tx: oneshot::Sender<Result<ConnId>>,
     },
 
     Disconnect {
@@ -304,10 +323,14 @@ pub enum Command {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::mpsc;
-    use tokio::sync::oneshot;
+    use tokio::sync::{
+        mpsc::{self, error::SendError},
+        oneshot,
+    };
 
-    fn setup_test_server() -> (
+    fn setup_test_server(
+        errors: Arc<Mutex<Vec<Error>>>,
+    ) -> (
         Arc<Mutex<GameServer>>,
         GameHandle,
         actix_rt::task::JoinHandle<()>,
@@ -318,7 +341,10 @@ mod tests {
         let server_clone = Arc::clone(&server);
         let server_task = tokio::spawn(async move {
             let mut server = server_clone.lock().await;
-            server.run().await.unwrap();
+
+            if let Err(error) = server.run().await {
+                errors.lock().await.push(error);
+            }
         });
 
         (server, handle, server_task)
@@ -332,7 +358,7 @@ mod tests {
         server_task.await.expect("Server task did not complete");
     }
 
-    async fn connect_user(nickname: &str, handle: &GameHandle) -> Result<ConnId, String> {
+    async fn connect_user(nickname: &str, handle: &GameHandle) -> Result<ConnId> {
         let (tx, _rx) = mpsc::unbounded_channel();
         let (res_tx, res_rx) = oneshot::channel();
 
@@ -353,7 +379,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_user_connection() {
-        let (server, handle, server_task) = setup_test_server();
+        let errors = Arc::new(Mutex::new(vec![]));
+        let (server, handle, server_task) = setup_test_server(errors);
         let conn_id = connect_user("Player1", &handle).await;
 
         // unlock the server
@@ -369,14 +396,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_user_disconnection() {
-        let (server, handle, server_task) = setup_test_server();
+        let errors = Arc::new(Mutex::new(vec![]));
+        let (server, handle, server_task) = setup_test_server(errors);
 
-        let conn_id = connect_user("Player1", &handle).await;
+        let conn_id = connect_user("Player1", &handle).await.unwrap();
 
         handle
             .cmd_tx
             .send(Command::Disconnect {
-                conn_id: conn_id.clone().unwrap(),
+                conn_id: conn_id.clone(),
             })
             .unwrap();
 
@@ -384,15 +412,16 @@ mod tests {
         shutdown_test_server(&handle, server_task).await;
         let server = server.lock().await;
 
-        assert!(!server.users.contains_key(&conn_id.unwrap()));
+        assert!(!server.users.contains_key(&conn_id));
         assert_eq!(server.users_summary(), OutboundMessage::UserList(vec![]));
     }
 
     #[tokio::test]
     async fn test_voting() {
-        let (server, handle, server_task) = setup_test_server();
+        let errors = Arc::new(Mutex::new(vec![]));
+        let (server, handle, server_task) = setup_test_server(errors.clone());
 
-        let conn_id = connect_user("Player1", &handle).await;
+        let conn_id = connect_user("Player1", &handle).await.unwrap();
         let _ = connect_user("Player2", &handle).await;
 
         let vote = Vote::Option(2);
@@ -400,7 +429,7 @@ mod tests {
         handle
             .cmd_tx
             .send(Command::Vote {
-                conn_id: conn_id.clone().unwrap(),
+                conn_id: conn_id.clone(),
                 vote: vote.clone(),
             })
             .unwrap();
@@ -409,16 +438,19 @@ mod tests {
         shutdown_test_server(&handle, server_task).await;
         let server = server.lock().await;
 
-        assert_eq!(
-            server.users.get(&conn_id.unwrap()).unwrap().vote,
-            Vote::Option(2)
-        );
+        assert_eq!(server.users.get(&conn_id).unwrap().vote, Vote::Option(2));
         assert_eq!(
             server.votes_summary(),
             OutboundMessage::VotesStatus(vec![
                 ("Player1".into(), VoteStatus::Voted),
                 ("Player2".into(), VoteStatus::NotVoted),
             ])
+        );
+
+        assert!(
+            matches!(&errors.lock().await[0], Error::SendMessage(SendError(_))),
+            "{:?}",
+            errors.lock().await
         );
     }
 }

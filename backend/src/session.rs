@@ -1,4 +1,5 @@
 use crate::{
+    error::Result,
     game::{ConnId, GameHandle, Nickname, OutboundMessage},
     handlers::Mode,
 };
@@ -20,29 +21,14 @@ async fn handle_text_message(
     conn_id: &mut Option<ConnId>,
     game_handler: &GameHandle,
     conn_tx: &mpsc::UnboundedSender<OutboundMessage>,
-) -> Result<(), String> {
+) -> Result<()> {
     if nickname.is_none() {
         if let InboundMessage::Connect {
             nickname: new_nickname,
         } = inbound
         {
-            let result = game_handler.connect(conn_tx.clone(), new_nickname).await;
+            *conn_id = Some(game_handler.connect(conn_tx.clone(), new_nickname).await?);
             *nickname = Some(new_nickname.to_string());
-
-            match result {
-                Ok(Ok(new_conn_id)) => {
-                    *conn_id = Some(new_conn_id);
-                    return Ok(());
-                }
-                Err(err) => {
-                    log::error!("Failed to connect: {}", err);
-                    return Err(err.to_string());
-                }
-                Ok(Err(err)) => {
-                    log::error!("Failed to connect: {}", err);
-                    return Err(err);
-                }
-            }
         }
 
         return Ok(());
@@ -52,8 +38,8 @@ async fn handle_text_message(
 
     if let Some(conn_id) = conn_id {
         match inbound {
-            InboundMessage::SetStatus(value) => game_handler.set_status(conn_id, value).await,
-            InboundMessage::Vote { value } => game_handler.vote(conn_id, value).await,
+            InboundMessage::SetStatus(value) => game_handler.set_status(conn_id, value).await?,
+            InboundMessage::Vote { value } => game_handler.vote(conn_id, value).await?,
             _ => {}
         }
     }
@@ -130,7 +116,7 @@ pub async fn init(
                             log::error!("{}", err);
                             break Some(CloseReason {
                                 code: 1008.into(),
-                                description: Some(err.to_owned()),
+                                description: Some(err.to_string()),
                             });
                         }
                     }
@@ -187,7 +173,10 @@ pub async fn init(
     };
 
     if let Some(conn_id) = conn_id {
-        game_handler.disconnect(&conn_id);
+        match game_handler.disconnect(&conn_id) {
+            Ok(_) => {}
+            Err(err) => log::error!("failed to disconnect user: {:?}: {}", conn_id, err),
+        }
     }
 
     let _ = session.close(close_reason).await;

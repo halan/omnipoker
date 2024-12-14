@@ -1,9 +1,7 @@
 use super::game::{Command, ConnId, OutboundMessage, Vote};
+use crate::error::Result;
 use shared::UserStatus;
-use tokio::sync::{
-    mpsc,
-    oneshot::{self, error::RecvError},
-};
+use tokio::sync::{mpsc, oneshot};
 
 #[derive(Debug, Clone)]
 pub struct GameHandle {
@@ -15,44 +13,42 @@ impl GameHandle {
         &self,
         conn_tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
-    ) -> Result<Result<ConnId, String>, RecvError> {
+    ) -> Result<ConnId> {
         let (res_tx, res_rx) = oneshot::channel();
 
-        self.cmd_tx
-            .send(Command::Connect {
-                conn_tx,
-                nickname: nickname.into(),
-                res_tx,
-            })
-            .expect("Failed to send Command::Connect");
+        self.cmd_tx.send(Command::Connect {
+            conn_tx,
+            nickname: nickname.into(),
+            res_tx,
+        })?;
 
-        res_rx.await
+        res_rx.await?
     }
 
-    pub fn disconnect(&self, conn_id: &ConnId) {
-        self.cmd_tx
-            .send(Command::Disconnect {
-                conn_id: conn_id.clone(),
-            })
-            .expect("Failed to send Command::Disconnect");
+    pub fn disconnect(&self, conn_id: &ConnId) -> Result<()> {
+        self.cmd_tx.send(Command::Disconnect {
+            conn_id: conn_id.clone(),
+        })?;
+
+        Ok(())
     }
 
-    pub async fn vote(&self, conn_id: &ConnId, vote: &Vote) {
-        self.cmd_tx
-            .send(Command::Vote {
-                conn_id: conn_id.clone(),
-                vote: vote.clone(),
-            })
-            .expect("Failed to send Command::Vote");
+    pub async fn vote(&self, conn_id: &ConnId, vote: &Vote) -> Result<()> {
+        self.cmd_tx.send(Command::Vote {
+            conn_id: conn_id.clone(),
+            vote: vote.clone(),
+        })?;
+
+        Ok(())
     }
 
-    pub async fn set_status(&self, conn_id: &ConnId, status: &UserStatus) {
-        self.cmd_tx
-            .send(Command::SetAway {
-                conn_id: conn_id.clone(),
-                status: status.clone(),
-            })
-            .expect("Failed to send Command::SetAway");
+    pub async fn set_status(&self, conn_id: &ConnId, status: &UserStatus) -> Result<()> {
+        self.cmd_tx.send(Command::SetAway {
+            conn_id: conn_id.clone(),
+            status: status.clone(),
+        })?;
+
+        Ok(())
     }
 }
 
@@ -93,7 +89,7 @@ mod tests {
             .await
             .expect("Failed to receive ConnId");
 
-        assert_eq!(conn_id, Ok(expected_conn_id));
+        assert_eq!(conn_id, expected_conn_id);
     }
 
     #[tokio::test]
@@ -114,6 +110,6 @@ mod tests {
             }
         });
 
-        game_handle.vote(&conn_id, &vote_value).await;
+        let _ = game_handle.vote(&conn_id, &vote_value).await;
     }
 }

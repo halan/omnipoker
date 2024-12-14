@@ -2,6 +2,7 @@ use actix_web::{web::Data, App, HttpServer};
 use std::sync::{Arc, Mutex};
 
 mod cli;
+mod error;
 mod game;
 mod handlers;
 mod limit;

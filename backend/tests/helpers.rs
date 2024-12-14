@@ -70,7 +70,7 @@ impl ServerGuard {
             let elapsed = start_time.elapsed();
             if elapsed >= *max_duration {
                 println!(
-                    "Captured errors before timeout: {}",
+                    "Captured errors before timeout:\n{}",
                     self.errs
                         .lock()
                         .unwrap()
