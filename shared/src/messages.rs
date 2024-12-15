@@ -18,6 +18,7 @@ pub enum OutboundMessage {
     YourVote(Vote),
     YourStatus(UserStatus),
     Unknown,
+    Error(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

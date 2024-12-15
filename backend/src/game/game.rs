@@ -1,9 +1,9 @@
-use super::command_handle::*;
+use super::game_handle::*;
 use crate::error::{Error, Result};
 use shared::VoteStatus;
 pub use shared::{OutboundMessage, UserStatus, Vote};
 use std::{cmp::Ordering, collections::HashMap};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 use uuid::Uuid;
 
@@ -85,7 +85,7 @@ impl GameServer {
         )
     }
 
-    async fn connect(
+    pub async fn connect(
         &mut self,
         tx: mpsc::UnboundedSender<OutboundMessage>,
         nickname: &str,
@@ -153,7 +153,7 @@ impl GameServer {
             .any(|user| user.vote.is_valid_vote() && matches!(user.status, UserStatus::Active))
     }
 
-    fn set_status(&mut self, id: &ConnId, status: &UserStatus) -> Result<()> {
+    pub fn set_status(&mut self, id: &ConnId, status: &UserStatus) -> Result<()> {
         self.users
             .get_mut(&id)
             .map(|user| user.status = status.clone());
@@ -258,79 +258,14 @@ impl GameServer {
 
         Ok(())
     }
-
-    pub async fn run(&mut self) -> Result<()> {
-        while let Some(cmd) = self.cmd_rx.recv().await {
-            match cmd {
-                Command::Connect {
-                    conn_tx,
-                    nickname,
-                    res_tx,
-                } => {
-                    let result = self.connect(conn_tx, &nickname).await;
-                    let _ = res_tx.send(result);
-                }
-
-                Command::Disconnect { conn_id } => {
-                    self.disconnect(&conn_id)?;
-                }
-
-                Command::Vote { conn_id, vote } => {
-                    self.vote(&conn_id, &vote)?;
-                }
-
-                Command::SetAway { conn_id, status } => {
-                    self.set_status(&conn_id, &status)?;
-                }
-                #[cfg(test)]
-                Command::Shutdown => {
-                    println!("Shutting down server.");
-                    break;
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub enum Command {
-    Connect {
-        conn_tx: mpsc::UnboundedSender<OutboundMessage>,
-        nickname: String,
-        res_tx: oneshot::Sender<Result<ConnId>>,
-    },
-
-    Disconnect {
-        conn_id: ConnId,
-    },
-
-    Vote {
-        conn_id: ConnId,
-        vote: Vote,
-    },
-
-    SetAway {
-        conn_id: ConnId,
-        status: UserStatus,
-    },
-
-    #[cfg(test)]
-    Shutdown,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::{
-        mpsc::{self, error::SendError},
-        oneshot,
-    };
+    use tokio::sync::{mpsc, oneshot};
 
-    fn setup_test_server(
-        errors: Arc<Mutex<Vec<Error>>>,
-    ) -> (
+    fn setup_test_server() -> (
         Arc<Mutex<GameServer>>,
         GameHandle,
         actix_rt::task::JoinHandle<()>,
@@ -342,9 +277,7 @@ mod tests {
         let server_task = tokio::spawn(async move {
             let mut server = server_clone.lock().await;
 
-            if let Err(error) = server.run().await {
-                errors.lock().await.push(error);
-            }
+            server.run().await;
         });
 
         (server, handle, server_task)
@@ -367,7 +300,7 @@ mod tests {
             .send(Command::Connect {
                 conn_tx: tx,
                 nickname: nickname.into(),
-                res_tx,
+                res_tx: Some(res_tx),
             })
             .unwrap();
 
@@ -379,8 +312,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_user_connection() {
-        let errors = Arc::new(Mutex::new(vec![]));
-        let (server, handle, server_task) = setup_test_server(errors);
+        let (server, handle, server_task) = setup_test_server();
         let conn_id = connect_user("Player1", &handle).await;
 
         // unlock the server
@@ -396,8 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_user_disconnection() {
-        let errors = Arc::new(Mutex::new(vec![]));
-        let (server, handle, server_task) = setup_test_server(errors);
+        let (server, handle, server_task) = setup_test_server();
 
         let conn_id = connect_user("Player1", &handle).await.unwrap();
 
@@ -405,6 +336,7 @@ mod tests {
             .cmd_tx
             .send(Command::Disconnect {
                 conn_id: conn_id.clone(),
+                res_tx: None,
             })
             .unwrap();
 
@@ -418,8 +350,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_voting() {
-        let errors = Arc::new(Mutex::new(vec![]));
-        let (server, handle, server_task) = setup_test_server(errors.clone());
+        let (server, handle, server_task) = setup_test_server();
 
         let conn_id = connect_user("Player1", &handle).await.unwrap();
         let _ = connect_user("Player2", &handle).await;
@@ -431,6 +362,7 @@ mod tests {
             .send(Command::Vote {
                 conn_id: conn_id.clone(),
                 vote: vote.clone(),
+                res_tx: None,
             })
             .unwrap();
 
@@ -445,12 +377,6 @@ mod tests {
                 ("Player1".into(), VoteStatus::Voted),
                 ("Player2".into(), VoteStatus::NotVoted),
             ])
-        );
-
-        assert!(
-            matches!(&errors.lock().await[0], Error::SendMessage(SendError(_))),
-            "{:?}",
-            errors.lock().await
         );
     }
 }

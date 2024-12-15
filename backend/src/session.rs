@@ -1,5 +1,5 @@
 use crate::{
-    error::Result,
+    error::{Result, *},
     game::{ConnId, GameHandle, Nickname, OutboundMessage},
     handlers::Mode,
 };
@@ -45,6 +45,34 @@ async fn handle_text_message(
     }
 
     Ok(())
+}
+
+async fn handle_error(result: Result<()>, session: &mut actix_ws::Session) -> Option<CloseReason> {
+    if let Err(err) = result {
+        log::error!("{}", err);
+
+        match err {
+            // handle errors that should close the connection
+            Error::NicknameAlreadyInUse(_) | Error::NicknameCannotBeEmpty => {
+                return Some(CloseReason {
+                    code: 1008.into(),
+                    description: Some(err.to_string()),
+                });
+            }
+            // handle errors that should be sent to the user
+            _ => {
+                session
+                    .text(
+                        serde_json::to_string(&OutboundMessage::Error(err.to_string()))
+                            .expect("failed to serialize error message"),
+                    )
+                    .await
+                    .expect("failed to send error message to the user");
+            }
+        }
+    }
+
+    None
 }
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -112,12 +140,11 @@ pub async fn init(
                         )
                         .await;
 
-                        if let Err(err) = result {
-                            log::error!("{}", err);
-                            break Some(CloseReason {
-                                code: 1008.into(),
-                                description: Some(err.to_string()),
-                            });
+                        {
+                            let result = handle_error(result, &mut session).await;
+                            if result.is_some() {
+                                break result;
+                            }
                         }
                     }
 
@@ -173,7 +200,7 @@ pub async fn init(
     };
 
     if let Some(conn_id) = conn_id {
-        match game_handler.disconnect(&conn_id) {
+        match game_handler.disconnect(&conn_id).await {
             Ok(_) => {}
             Err(err) => log::error!("failed to disconnect user: {:?}: {}", conn_id, err),
         }

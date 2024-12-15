@@ -1,5 +1,5 @@
-mod command_handle;
 mod game;
+mod game_handle;
 
-pub use command_handle::*;
 pub use game::*;
+pub use game_handle::*;

@@ -1,8 +1,7 @@
 use crate::game::Command;
+use crate::game::ConnId;
 use shared::OutboundMessage;
 use tokio::sync::{mpsc::error::SendError, oneshot::error::RecvError};
-
-use crate::game::ConnId;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -16,6 +15,12 @@ pub enum Error {
     Recv(RecvError),
 }
 
+impl From<SendError<Command>> for Error {
+    fn from(err: SendError<Command>) -> Self {
+        Error::SendCommand(err)
+    }
+}
+
 impl From<SendError<OutboundMessage>> for Error {
     fn from(err: SendError<OutboundMessage>) -> Self {
         Error::SendMessage(err)
@@ -25,12 +30,6 @@ impl From<SendError<OutboundMessage>> for Error {
 impl From<RecvError> for Error {
     fn from(err: RecvError) -> Self {
         Error::Recv(err)
-    }
-}
-
-impl From<SendError<Command>> for Error {
-    fn from(err: SendError<Command>) -> Self {
-        Error::SendCommand(err)
     }
 }
 
