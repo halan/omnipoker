@@ -75,6 +75,13 @@ async fn handle_error(result: Result<()>, session: &mut actix_ws::Session) -> Op
     None
 }
 
+fn parse_inbound_message(text: &str, mode: &Option<Mode>) -> InboundMessage {
+    match mode {
+        Some(Mode::Json) => serde_json::from_str(text).unwrap_or(InboundMessage::Unknown),
+        _ => InboundMessage::from_string(text),
+    }
+}
+
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -120,16 +127,11 @@ pub async fn init(
 
                     // text message from client
                     AggregatedMessage::Text(text) => {
-                        let inbound = match mode {
-                            Some(Mode::Json) => match serde_json::from_str(&text) {
-                                Ok(inbound) => inbound,
-                                Err(err) => {
-                                    log::error!("failed to parse JSON message: {}", err);
-                                    continue;
-                                }
-                            },
-                            _ => text.into(),
-                        };
+                        let inbound = parse_inbound_message(&text, &mode);
+                        if let InboundMessage::Unknown = inbound {
+                            log::error!("Unknown message: {}", text);
+                            continue;
+                        }
 
                         let result = handle_text_message(
                             &inbound,
@@ -207,4 +209,87 @@ pub async fn init(
     }
 
     let _ = session.close(close_reason).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_parse_inbound_message_json() {
+        let mode = Some(Mode::Json);
+
+        let text = &json!({"connect": {"nickname": "Player1"}}).to_string();
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(
+            result,
+            InboundMessage::Connect {
+                nickname: "Player1".to_string()
+            }
+        );
+
+        let text = &json!({"setstatus": "Active"}).to_string();
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(
+            result,
+            InboundMessage::SetStatus(shared::UserStatus::Active)
+        );
+
+        let text = &json!({"vote": {"value": "2"}}).to_string();
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(
+            result,
+            InboundMessage::Vote {
+                value: shared::Vote::Option(2)
+            }
+        );
+
+        let text = &json!({"unknown": "message"}).to_string();
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(result, InboundMessage::Unknown);
+    }
+
+    #[tokio::test]
+    async fn test_parse_inbound_message_text() {
+        let mode = None;
+
+        let text = "/join Player1";
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(
+            result,
+            InboundMessage::Connect {
+                nickname: "Player1".to_string()
+            }
+        );
+
+        let text = "/setaway";
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(result, InboundMessage::SetStatus(shared::UserStatus::Away));
+
+        let text = "/setback";
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(
+            result,
+            InboundMessage::SetStatus(shared::UserStatus::Active)
+        );
+
+        let text = "2";
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(
+            result,
+            InboundMessage::Vote {
+                value: shared::Vote::Option(2)
+            }
+        );
+
+        let text = "unknown message";
+        let result = parse_inbound_message(text, &mode);
+        assert_eq!(
+            result,
+            InboundMessage::Vote {
+                value: shared::Vote::Null
+            }
+        );
+    }
 }

@@ -21,7 +21,7 @@ pub enum OutboundMessage {
     Error(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum InboundMessage {
     Connect { nickname: String },
